@@ -21,8 +21,8 @@ concurrency:
 
 jobs:
   release:
-    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/release.yml@v0.1.6
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/release.yml@v0.1.7
     with:
       framework-repository: Blecoeur/autonomous-dependency-maintainer
-      framework-ref: v0.1.6
+      framework-ref: v0.1.7
       base-branch: main
