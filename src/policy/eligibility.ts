@@ -1,4 +1,5 @@
 import type { MaintenanceConfig } from '../config/schema.js';
+import { INFRASTRUCTURE_UPDATE_PATHS } from '../config/schema.js';
 import { parseDependabotTitle } from './dependabot.js';
 import { guardManifests } from './manifests.js';
 import { matchesAny, matchedPatterns } from './paths.js';
@@ -51,6 +52,23 @@ export function evaluatePr(config: MaintenanceConfig, pr: PrInput): PolicyDecisi
         'labels do not grant eligibility.',
     );
     return build('not-maintenance', 'none', reasons, details, updates);
+  }
+
+  // Infrastructure-only updates (e.g. Dependabot's github-actions ecosystem)
+  // modify the trust engine itself. They are legitimate maintenance but are
+  // merged by human decision only: green check, visible, never auto-merged.
+  // A PR mixing infrastructure with anything else stays a hard rejection.
+  if (
+    isDependencyBot &&
+    pr.files.length > 0 &&
+    pr.files.every((file) => matchesAny(file, INFRASTRUCTURE_UPDATE_PATHS))
+  ) {
+    reasons.push('infrastructure-update-needs-human');
+    details.push(
+      'This maintenance PR updates CI/Actions infrastructure; infrastructure ' +
+        'changes are merged by human decision only and are never auto-merged.',
+    );
+    return build('needs-human', 'none', reasons, details, updates);
   }
 
   // 3. Forbidden paths reject any maintenance PR, regardless of circuit.

@@ -101,12 +101,18 @@ Evaluation order (first failure wins):
 1. **Base branch mismatch** → `not-maintenance` (`wrong-base-branch`).
 2. **Author not in `allowed_authors` ∪ `ai_authors`** → `not-maintenance`
    (`author-not-authorized`). Labels are never consulted for identity.
-3. **Forbidden path touched** → `rejected` (`forbidden-path-changed`).
-4. **Protected manifest section changed** (any `package.json` snapshot shows
+3. **Infrastructure-only update from a dependency bot** (every changed file
+   inside `.github/workflows/**`, e.g. a Dependabot github-actions update) →
+   `needs-human` (`infrastructure-update-needs-human`): green check, visible,
+   merged by human decision, never auto-merged.
+4. **Forbidden path touched** (anything else) → `rejected`
+   (`forbidden-path-changed`). Mixing infrastructure with non-infrastructure
+   files is a rejection, not a needs-human.
+5. **Protected manifest section changed** (any `package.json` snapshot shows
    a diff on `scripts`, `lint-staged`, `husky`, `simple-git-hooks`,
    `pre-commit`; or a manifest was added/removed) → `rejected`
    (`protected-manifest-section-changed`).
-5. **Dependency-bot circuit** (`allowed_authors`):
+6. **Dependency-bot circuit** (`allowed_authors`):
    - a changed file outside manifest/lockfile patterns → `rejected`
      (`unexpected-file-changes`);
    - no parsable dependency movement → `needs-human`
@@ -117,7 +123,7 @@ Evaluation order (first failure wins):
    - minor/patch while `allow_minor`/`allow_patch` is false → `needs-human`
      (`update-type-not-allowed`);
    - otherwise → **`eligible`**, classification `dependencies-only`.
-6. **AI circuit** (`ai_authors`):
+7. **AI circuit** (`ai_authors`):
    - `repair.enabled` false → `needs-human` (`ai-repair-disabled`);
    - missing `ai-assisted` label → `needs-human` (`missing-ai-label`);
    - major in the repaired update → `needs-human`

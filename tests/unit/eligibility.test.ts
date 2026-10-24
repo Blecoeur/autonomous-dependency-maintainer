@@ -122,6 +122,48 @@ describe('evaluatePr — dependencies-only circuit', () => {
     expect(decision.decision).toBe('not-maintenance');
     expect(decision.reasons).toContain('wrong-base-branch');
   });
+
+  it('surfaces a dependabot actions-update PR as needs-human, not rejected', () => {
+    const decision = evaluatePr(
+      makeConfig(),
+      makePr({
+        title: 'Bump actions/checkout from 4 to 5',
+        files: ['.github/workflows/maintenance-ci.yml'],
+        labels: ['dependencies', 'infrastructure'],
+      }),
+    );
+    expect(decision.decision).toBe('needs-human');
+    expect(decision.reasons).toContain('infrastructure-update-needs-human');
+    expect(decision.automerge).toBe(false);
+    expect(decision.classification).toBe('none');
+  });
+
+  it('treats a multi-file actions update as needs-human', () => {
+    const decision = evaluatePr(
+      makeConfig(),
+      makePr({
+        title: 'Bump the github-actions group with 2 updates',
+        files: ['.github/workflows/ci.yml', '.github/workflows/maintenance-release.yml'],
+      }),
+    );
+    expect(decision.decision).toBe('needs-human');
+  });
+
+  it('still rejects a PR mixing infrastructure with application files', () => {
+    const decision = evaluatePr(
+      makeConfig(),
+      makePr({ files: ['.github/workflows/ci.yml', 'package.json'] }),
+    );
+    expect(decision.decision).toBe('rejected');
+    expect(decision.reasons).toContain('forbidden-path-changed');
+    expect(decision.reasons).not.toContain('infrastructure-update-needs-human');
+  });
+
+  it('still rejects a dependabot PR touching CODEOWNERS (not workflows-only)', () => {
+    const decision = evaluatePr(makeConfig(), makePr({ files: ['CODEOWNERS'] }));
+    expect(decision.decision).toBe('rejected');
+    expect(decision.reasons).toContain('forbidden-path-changed');
+  });
 });
 
 describe('evaluatePr — ai-assisted circuit', () => {
@@ -161,6 +203,15 @@ describe('evaluatePr — ai-assisted circuit', () => {
     const decision = evaluatePr(
       aiConfig(),
       aiPr({ files: ['.github/workflows/maintenance-ci.yml', 'package.json'] }),
+    );
+    expect(decision.decision).toBe('rejected');
+    expect(decision.reasons).toContain('forbidden-path-changed');
+  });
+
+  it('rejects an AI PR touching only workflows (no infrastructure exemption for AI)', () => {
+    const decision = evaluatePr(
+      aiConfig(),
+      aiPr({ files: ['.github/workflows/maintenance-ci.yml'] }),
     );
     expect(decision.decision).toBe('rejected');
     expect(decision.reasons).toContain('forbidden-path-changed');
