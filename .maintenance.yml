@@ -1,0 +1,66 @@
+schema_version: 1
+
+project:
+  name: autonomous-dependency-maintainer
+  ecosystem: node-pnpm
+  base_branch: main
+
+updates:
+  schedule: weekly
+  cooldown_days: 3
+  max_open_prs: 10
+  grouping: individual
+  allow_minor: true
+  allow_patch: true
+  major:
+    default: defer
+    enable_maintenance_audit: false
+    migrate_if_eol_verified: false
+    migrate_if_security_unpatched: true
+
+validation:
+  install: pnpm install --frozen-lockfile
+  build: pnpm build
+  typecheck: pnpm typecheck
+  test: pnpm test
+  smoke: null
+  required_checks:
+    - 'build-and-test'
+    - 'maintenance-policy / maintenance-policy'
+
+repair:
+  provider: mistral-workflows
+  enabled: false
+  max_attempts: 3
+  max_parallel_per_repo: 1
+  max_changed_application_files: 10
+  preserve_public_api: true
+  forbidden_paths:
+    - .github/**
+    - .maintenance.yml
+    - CODEOWNERS
+    - '**/*.test.*'
+    - '**/*.spec.*'
+    - '**/__tests__/**'
+    - '**/__snapshots__/**'
+    - '**/*.snap'
+  # The framework is the trust engine: AI repairs are blocked until the
+  # Phase 3 circuit is reviewed, and even then only after declaring a
+  # reviewed application surface.
+  allowed_ai_paths: []
+
+merge:
+  mode: github-auto-merge
+  strategy: squash
+  allowed_authors:
+    - 'dependabot[bot]'
+  ai_authors: []
+
+# The framework tags manually and deliberately (no weekly auto-release);
+# versioning documents the convention future releases will follow.
+release:
+  schedule: manual
+  versioning: source-aware
+  initial_major: 0
+  publish_github_release: true
+  publish_ghcr: false

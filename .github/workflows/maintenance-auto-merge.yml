@@ -1,0 +1,30 @@
+# Maintenance auto-merge for the framework repository itself.
+#
+# Self-hosted, pinned at the last released version. pull_request_target
+# runs in the trusted base context and never checks out PR code; the
+# reusable workflow verifies provenance and enables GitHub's native
+# auto-merge. The merge is authorized only by the required checks on main
+# (build-and-test + maintenance-policy).
+
+name: Maintenance auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: maintenance-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.1.5
+    with:
+      allowed-authors: 'dependabot[bot]'
+      base-branch: main
+      strategy: squash
+      github-token: ${{ github.token }}
