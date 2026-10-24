@@ -51,11 +51,23 @@ GitHub merges only when every required check passes
   branch**, so a PR cannot weaken the rules applied to itself.
 - The auto-merge job never checks out or executes PR code.
 
+## Self-hosted
+
+This repository is maintained by its own framework: Dependabot npm
+updates go through the same policy check and auto-merge circuit as any
+consumer, with the wrappers pinned to the **last released** tag. A PR
+that modifies the policy engine is therefore evaluated by the previously
+released engine — the framework cannot weaken its own rules mid-flight.
+`github-actions` updates are deliberately absent: this repository's
+workflows are the trust engine, updated manually. Framework releases are
+tagged manually and deliberately; consumers bump their pins in an
+explicit, reviewable change.
+
 ## Install into a repository
 
 1. Copy `templates/github-public-node-pnpm/` files into the target repo
-   (`.maintenance.yml`, `.github/dependabot.yml`, two workflow wrappers).
-2. The wrappers are pre-pinned to `Blecoeur/autonomous-dependency-maintainer@v0.1.0`;
+   (`.maintenance.yml`, `.github/dependabot.yml`, three workflow wrappers).
+2. The wrappers are pre-pinned to `Blecoeur/autonomous-dependency-maintainer@v0.1.6`;
    if you use your own deployment, replace that reference with yours, always an
    immutable tag or full commit SHA. Never reference `@main`.
 3. Adjust the validation commands in `.maintenance.yml` and the CI wrapper to
