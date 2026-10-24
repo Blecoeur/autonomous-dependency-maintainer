@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   auto-merge:
-    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.1.0
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.1.1
     with:
       # Only recognized maintenance bots. GitHub App bots of the AI repair
       # circuit are added here once deployed.

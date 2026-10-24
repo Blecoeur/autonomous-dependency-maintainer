@@ -124,7 +124,9 @@ jobs:
               >> /tmp/manifests.ndjson
           done
 
-          jq -s --slurpfile manifests <(jq -s '.' /tmp/manifests.ndjson) '.manifests = $manifests[0]' /tmp/pr-input.json > /tmp/pr-input-full.json
+          jq -s '.' /tmp/manifests.ndjson > /tmp/manifests.json
+          jq --slurpfile manifests /tmp/manifests.json \
+            '.manifests = $manifests[0]' /tmp/pr-input.json > /tmp/pr-input-full.json
           mv /tmp/pr-input-full.json /tmp/pr-input.json
 
           echo "Collected PR input:"
