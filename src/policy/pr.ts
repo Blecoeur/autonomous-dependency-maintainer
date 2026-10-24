@@ -63,7 +63,8 @@ export type DecisionReasonCode =
   | 'ai-path-not-allowed'
   | 'too-many-application-files'
   | 'ai-repair-disabled'
-  | 'major-requires-policy-authorization';
+  | 'major-requires-policy-authorization'
+  | 'no-config-on-base';
 
 export interface PolicyDecision {
   decision: Decision;

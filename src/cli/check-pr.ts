@@ -2,7 +2,7 @@
 import { appendFileSync, readFileSync } from 'node:fs';
 import { loadConfig } from '../config/load.js';
 import { evaluatePr } from '../policy/eligibility.js';
-import { DECISION_EXIT_CODES, type PrInput } from '../policy/pr.js';
+import { DECISION_EXIT_CODES, type PolicyDecision, type PrInput } from '../policy/pr.js';
 
 /**
  * maintenance-check-pr — evaluates a pull request against the repository's
@@ -39,7 +39,36 @@ function main(): number {
     return 2;
   }
 
-  const configResult = loadConfig(readFileSync(configPath, 'utf8'));
+  // Bootstrap case: the configuration lives on the base branch and is
+  // introduced by the very PR being checked. Without a config there is no
+  // maintenance circuit, so nothing is eligible — pass without eligibility
+  // and say so. Absence of policy can never grant automerge.
+  let configText: string;
+  try {
+    configText = readFileSync(configPath, 'utf8');
+  } catch {
+    const decision: PolicyDecision = {
+      decision: 'not-maintenance',
+      classification: 'none',
+      reasons: ['no-config-on-base'],
+      details: [
+        `No ${configPath} on the base branch: the maintenance policy is not installed yet. Nothing is eligible for auto-merge until the configuration lands on the base branch.`,
+      ],
+      automerge: false,
+      dependencyUpdates: [],
+    };
+    console.log(JSON.stringify(decision, null, 2));
+    const summaryFile = process.env['GITHUB_STEP_SUMMARY'];
+    if (summaryFile) {
+      appendFileSync(
+        summaryFile,
+        `### Maintenance policy: ${decision.decision}\n\n${decision.details.join('\n')}\n`,
+      );
+    }
+    return 0;
+  }
+
+  const configResult = loadConfig(configText);
   if (!configResult.ok) {
     process.stderr.write(`invalid config ${configPath}:\n`);
     for (const error of configResult.errors) {
