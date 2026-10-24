@@ -42,8 +42,11 @@ Repository settings:
    auto-merge*.
 3. **Branch protection on `main`** (or rulesets):
    - require a pull request before merging;
-   - require status checks: `dependency-ci` and `maintenance-policy` (the job
-     names of the maintenance CI workflow);
+   - require status checks: the repository's own build/test checks **plus**
+     the policy check. Note the exact name of a check produced by a
+     reusable workflow is `<caller-job> / <called-job>` (e.g.
+     `maintenance-policy / maintenance-policy`) — read the real names from
+     the first green run, not from the workflow file;
    - do not allow bypassing for any actor;
    - require the branches to be up to date before merging (the framework
      relies on fresh CI against the current base).
