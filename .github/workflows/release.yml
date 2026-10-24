@@ -116,13 +116,12 @@ jobs:
               <<<"$pr" >> /tmp/prs.ndjson
           done < /tmp/merged.ndjson
 
-          jq -n \
+          jq -s \
             --argjson last_tag "$LT" \
             --arg repo "$REPO" \
             --arg fw "$FWREF" \
-            --slurpfile prs /tmp/prs.ndjson \
-            '{last_tag: $last_tag, source_repo: $repo, framework_ref: $fw, merged_prs: $prs[0]}' \
-            > /tmp/release-data.json
+            '{last_tag: $last_tag, source_repo: $repo, framework_ref: $fw, merged_prs: .}' \
+            /tmp/prs.ndjson > /tmp/release-data.json
 
           echo "Merged PRs since last tag: $(jq '.merged_prs | length' /tmp/release-data.json)"
 
