@@ -22,9 +22,10 @@ Design contract: [AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md](../AUTONOMOUS_DEPEN
 
 ## Status
 
-Phase 1 MVP (no AI). See [docs/onboarding.md](docs/onboarding.md) for the
-deployment checklist and the roadmap section below for what is intentionally
-missing.
+Phase 1 (policy + automerge, no AI) and Phase 2 (weekly release with
+source-aware versioning and provenance) are implemented. See
+[docs/onboarding.md](docs/onboarding.md) for the deployment checklist and the
+roadmap section below for what is intentionally missing.
 
 ## How it works
 
@@ -93,11 +94,15 @@ license).
 
 ## Roadmap
 
-- Phase 2 (next): weekly release workflow, source-aware versioning (PATCH for
-  dependency-only, MINOR when an AI-assisted fix is included), provenance
-  files, changelog generation.
-- Phase 3: `RepairProvider` interface, Mistral Workflows adapter, GitHub App
-  for replacement PRs, isolated repair sandbox.
+- Phase 3 (next): `RepairProvider` interface, Mistral Workflows adapter
+  (Python worker), GitHub App for replacement PRs, isolated repair sandbox.
 - Phase 4: major-version audit circuit (`deferred` / `migration-required` /
   `unknown` reports).
 - Phase 5: installer CLI, second-ecosystem adapters.
+
+Shipped:
+- Phase 1: policy engine, `maintenance-policy` required check, native
+  auto-merge circuit, templates, minimal example.
+- Phase 2: weekly release workflow (`release.yml`), source-aware versioning
+  (PATCH for dependency-only, MINOR when an AI-assisted fix is included),
+  generated release notes and machine-readable provenance.

@@ -1,0 +1,28 @@
+# Weekly maintenance release wrapper for the consumer repository.
+# Install at .github/workflows/maintenance-release.yml
+#
+# Dependabot works from Monday; the release runs Sunday so updates have the
+# week to be validated. The job is serialized (no concurrent tag creation) and
+# idempotent (reruns skip an existing tag).
+
+name: Weekly maintenance release
+
+on:
+  schedule:
+    - cron: '0 08 * * 0' # Sunday 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: maintenance-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/release.yml@v0.1.3
+    with:
+      framework-repository: Blecoeur/autonomous-dependency-maintainer
+      framework-ref: v0.1.3
+      base-branch: main

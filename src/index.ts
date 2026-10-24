@@ -21,3 +21,13 @@ export {
 } from './policy/semver.js';
 export { DECISION_EXIT_CODES, type Decision, type PolicyDecision, type PrInput } from './policy/pr.js';
 export { adapterFor, type EcosystemAdapter, NodePnpmAdapter } from './providers/ecosystem-node-pnpm/adapter.js';
+export {
+  assembleReleasePlan,
+  RELEASE_PROVENANCE_WARNING,
+  type ClassifiedPr,
+  type MergedPr,
+  type PrKind,
+  type ProvenanceDoc,
+  type ReleaseInputData,
+  type ReleasePlan,
+} from './release/plan.js';
