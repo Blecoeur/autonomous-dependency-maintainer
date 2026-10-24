@@ -1,0 +1,25 @@
+# Dependabot configuration for the framework repository itself.
+#
+# Policy: npm only. github-actions updates are deliberately absent — the
+# framework's workflow files ARE the trust engine consumed by other
+# repositories, and updating them is a manual, deliberate operation.
+#
+# Cooldown applies to version updates, not security updates. Ordinary majors
+# are deferred per policy; the npm dependencies here are dev/build tooling
+# (typescript, vitest, picomatch, yaml, @types/node).
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
