@@ -45,9 +45,6 @@ on:
       node-version:
         type: string
         default: '24'
-      pnpm-version:
-        type: string
-        default: '10'
 
 permissions:
   contents: read
@@ -74,7 +71,10 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: ${{ inputs.pnpm-version }}
+          # The framework's own packageManager pin is the version that must
+          # build its CLI. Never pass a version input here: it conflicts
+          # with any packageManager field in the checked-out files.
+          package_json_file: framework/package.json
 
       - uses: actions/setup-node@v4
         with:
