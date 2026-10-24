@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   auto-merge:
-    uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@FRAMEWORK_SHA_OR_TAG
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.1.0
     with:
       allowed-authors: 'dependabot[bot]'
       base-branch: main

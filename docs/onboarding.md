@@ -11,9 +11,10 @@ Copy from `templates/github-public-node-pnpm/`:
 | `maintenance-ci.yml` | `.github/workflows/maintenance-ci.yml` |
 | `maintenance-auto-merge.yml` | `.github/workflows/maintenance-auto-merge.yml` |
 
-Replace `YOUR_ORG` with the organization/user hosting your copy of this
-framework and `FRAMEWORK_SHA_OR_TAG` with an immutable tag or full commit
-SHA. Never reference `@main`.
+The templates are pre-filled with the deployed framework
+(`Blecoeur/autonomous-dependency-maintainer`) pinned at `v0.1.0`. When
+upgrading the framework, change the pin deliberately — an immutable tag or
+full commit SHA, never `main`.
 
 ## 2. Adapt the configuration
 

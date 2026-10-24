@@ -1,8 +1,9 @@
 # Maintenance CI wrapper for the consumer repository.
 # Install at .github/workflows/maintenance-ci.yml
 #
-# Replace YOUR_ORG and pin the framework to an immutable tag or full commit
-# SHA. Never reference @main: the framework is part of the trust chain.
+# The framework is referenced at a pinned immutable tag (v0.1.0). Upgrading the
+# framework is a deliberate, visible one-line change of that pin — never
+# reference @main: the framework is part of the trust chain.
 #
 # Required configuration on the consumer repository (Settings):
 # - Branch protection on main requiring: dependency-ci AND maintenance-policy.
@@ -20,7 +21,7 @@ permissions:
 
 jobs:
   dependency-ci:
-    uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/node-pnpm-ci.yml@FRAMEWORK_SHA_OR_TAG
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/node-pnpm-ci.yml@v0.1.0
     with:
       node-version: '24'
       install-command: 'pnpm install --frozen-lockfile'
@@ -29,10 +30,10 @@ jobs:
 
   maintenance-policy:
     if: github.event_name == 'pull_request'
-    uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/policy-check.yml@FRAMEWORK_SHA_OR_TAG
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/policy-check.yml@v0.1.0
     with:
       pr-number: ${{ github.event.pull_request.number }}
       base-ref: ${{ github.event.pull_request.base.ref }}
       head-sha: ${{ github.event.pull_request.head.sha }}
-      framework-repository: YOUR_ORG/autonomous-dependency-maintainer
-      framework-ref: FRAMEWORK_SHA_OR_TAG
+      framework-repository: Blecoeur/autonomous-dependency-maintainer
+      framework-ref: v0.1.0

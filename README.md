@@ -54,8 +54,9 @@ GitHub merges only when every required check passes
 
 1. Copy `templates/github-public-node-pnpm/` files into the target repo
    (`.maintenance.yml`, `.github/dependabot.yml`, two workflow wrappers).
-2. Replace `YOUR_ORG` and pin `FRAMEWORK_SHA_OR_TAG` to an immutable tag or
-   full commit SHA. Never reference `@main`.
+2. The wrappers are pre-pinned to `Blecoeur/autonomous-dependency-maintainer@v0.1.0`;
+   if you use your own deployment, replace that reference with yours, always an
+   immutable tag or full commit SHA. Never reference `@main`.
 3. Adjust the validation commands in `.maintenance.yml` and the CI wrapper to
    the real commands of the repository.
 4. Follow the GitHub settings checklist in

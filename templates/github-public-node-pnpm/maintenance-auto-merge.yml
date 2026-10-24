@@ -7,7 +7,8 @@
 # provenance and enables GitHub's native auto-merge; the merge itself is
 # authorized exclusively by the required checks configured on main.
 #
-# Replace YOUR_ORG and pin the framework to an immutable tag or full SHA.
+# The framework is referenced at a pinned immutable tag (v0.1.0); bump the pin
+# deliberately when upgrading — never @main.
 
 name: Maintenance auto-merge
 
@@ -25,7 +26,7 @@ concurrency:
 
 jobs:
   auto-merge:
-    uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@FRAMEWORK_SHA_OR_TAG
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.1.0
     with:
       # Only recognized maintenance bots. GitHub App bots of the AI repair
       # circuit are added here once deployed.

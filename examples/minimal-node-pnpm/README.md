@@ -5,7 +5,8 @@
 # check, and `maintenance-auto-merge` enables GitHub's native auto-merge.
 #
 # Before pushing this example anywhere:
-# 1. Replace YOUR_ORG and FRAMEWORK_SHA_OR_TAG in .github/workflows/*.
+# 1. The wrappers are pre-pinned to Blecoeur/autonomous-dependency-maintainer@v0.1.0;
+#    adjust if you deploy your own copy of the framework.
 # 2. Run `pnpm install` to generate pnpm-lock.yaml.
 # 3. Enable Dependabot version updates + security alerts on the repository.
 # 4. Require the `dependency-ci` and `maintenance-policy` checks on main.
