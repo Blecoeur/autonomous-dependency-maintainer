@@ -34,10 +34,6 @@ on:
         description: 'Merge strategy: squash, merge or rebase'
         type: string
         default: 'squash'
-      github-token:
-        description: 'Token with pull-requests:write and contents:write'
-        type: string
-        required: true
 
 permissions:
   contents: write
@@ -50,8 +46,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Verify provenance and enable native auto-merge
+        # github.token is read directly: secret values passed through
+        # workflow_call `with:` inputs arrive EMPTY on the called side.
+        # The token here is the caller's token, with the permissions the
+        # caller granted to this reusable workflow.
         env:
-          GH_TOKEN: ${{ inputs.github-token }}
+          GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_BASE: ${{ github.event.pull_request.base.ref }}

@@ -1,6 +1,6 @@
 {
   "name": "autonomous-dependency-maintainer",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Reusable GitHub-native framework for automated, policy-driven dependency maintenance: Dependabot + reusable Actions + native auto-merge, with optional AI repair behind a provider interface.",
   "type": "module",
   "license": "MIT",

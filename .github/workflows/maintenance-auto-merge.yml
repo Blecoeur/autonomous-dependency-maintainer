@@ -27,4 +27,3 @@ jobs:
       allowed-authors: 'dependabot[bot]'
       base-branch: main
       strategy: squash
-      github-token: ${{ github.token }}
