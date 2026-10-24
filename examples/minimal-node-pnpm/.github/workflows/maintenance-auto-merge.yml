@@ -1,0 +1,22 @@
+name: Maintenance auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: maintenance-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@FRAMEWORK_SHA_OR_TAG
+    with:
+      allowed-authors: 'dependabot[bot]'
+      base-branch: main
+      strategy: squash
+      github-token: ${{ github.token }}

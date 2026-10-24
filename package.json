@@ -1,0 +1,38 @@
+{
+  "name": "autonomous-dependency-maintainer",
+  "version": "0.1.0",
+  "description": "Reusable GitHub-native framework for automated, policy-driven dependency maintenance: Dependabot + reusable Actions + native auto-merge, with optional AI repair behind a provider interface.",
+  "type": "module",
+  "license": "MIT",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "maintenance-validate-config": "dist/cli/validate-config.js",
+    "maintenance-check-pr": "dist/cli/check-pr.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "picomatch": "^4.0.2",
+    "yaml": "^2.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

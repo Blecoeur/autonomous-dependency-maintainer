@@ -1,0 +1,33 @@
+name: Framework CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Build
+        run: pnpm build
+      - name: Unit tests
+        run: pnpm test
+      - name: Validate shipped example configs
+        run: |
+          node dist/cli/validate-config.js templates/github-public-node-pnpm/.maintenance.yml
+          node dist/cli/validate-config.js examples/minimal-node-pnpm/.maintenance.yml

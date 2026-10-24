@@ -1,0 +1,100 @@
+# Reusable CI workflow for node-pnpm repositories.
+#
+# Called from a consumer repository's wrapper, e.g.:
+#
+#   jobs:
+#     dependency-ci:
+#       uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/node-pnpm-ci.yml@v0.1.0
+#       with:
+#         install-command: 'pnpm install --frozen-lockfile'
+#         build-command: 'pnpm build'
+#         test-command: 'pnpm test'
+#
+# Security notes:
+# - Commands come from the consumer's own wrapper file (reviewed, on main),
+#   never from PR content. They are passed as workflow inputs, which are
+#   strings injected as quoted arguments below.
+# - The job holds no secrets: PR code is untrusted and gets read-only access.
+# - The job fails if any command is missing or exits non-zero; there is no
+#   silent skip. A missing test-command is an explicit misconfiguration.
+
+name: Node pnpm CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: 'Node.js version for setup-node'
+        type: string
+        default: '24'
+      pnpm-version:
+        description: 'pnpm version for pnpm/action-setup'
+        type: string
+        default: '10'
+      working-directory:
+        description: 'Root directory of the project inside the repository'
+        type: string
+        default: '.'
+      install-command:
+        description: 'Install command, e.g. pnpm install --frozen-lockfile'
+        type: string
+        required: true
+      build-command:
+        description: 'Build command, or empty to skip'
+        type: string
+        default: ''
+      typecheck-command:
+        description: 'Typecheck command, or empty to skip'
+        type: string
+        default: ''
+      test-command:
+        description: 'Test command, or empty to skip'
+        type: string
+        default: ''
+      smoke-command:
+        description: 'Smoke command, or empty to skip'
+        type: string
+        default: ''
+
+jobs:
+  dependency-ci:
+    name: dependency-ci
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'pnpm'
+          cache-dependency-path: ${{ inputs.working-directory }}/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: ${{ inputs.install-command }}
+
+      - name: Build
+        if: ${{ inputs.build-command != '' }}
+        run: ${{ inputs.build-command }}
+
+      - name: Typecheck
+        if: ${{ inputs.typecheck-command != '' }}
+        run: ${{ inputs.typecheck-command }}
+
+      - name: Test
+        if: ${{ inputs.test-command != '' }}
+        run: ${{ inputs.test-command }}
+
+      - name: Smoke
+        if: ${{ inputs.smoke-command != '' }}
+        run: ${{ inputs.smoke-command }}
+
+      - name: Guard against empty CI configuration
+        if: ${{ inputs.build-command == '' && inputs.test-command == '' && inputs.smoke-command == '' }}
+        run: |
+          echo "::error::No build, test, or smoke command configured. A green check with no verification is worse than no check."
+          exit 1

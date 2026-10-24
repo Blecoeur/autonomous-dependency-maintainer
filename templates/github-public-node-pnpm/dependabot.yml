@@ -1,0 +1,47 @@
+# Dependabot configuration for a public node-pnpm repository.
+# Install at .github/dependabot.yml in the consumer repository.
+#
+# Policy implemented here:
+# - weekly scan on Monday
+# - 3-day cooldown (explicit even though Dependabot applies it by default)
+# - ordinary MAJOR version updates are ignored (audit circuit handles them)
+# - one PR per dependency, capped at 20 open PRs
+#
+# Notes:
+# - Cooldown applies to version updates, not security updates. Security
+#   updates may be proposed immediately and still pass the same checks.
+# - github-actions updates touch the trust engine of the repository: they are
+#   deliberately NOT in the auto-merge allowed-authors list and require human
+#   review.
+# - For a pnpm monorepo, verify that the root directory covers all manifests;
+#   add `directories:` entries if needed.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Zurich
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 20
+    labels:
+      - dependencies
+    ignore:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-major
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 3
+    labels:
+      - dependencies
+      - infrastructure

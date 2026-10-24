@@ -1,0 +1,92 @@
+# Enable GitHub's NATIVE auto-merge for eligible maintenance PRs.
+#
+# This workflow does NOT decide whether the PR may merge, and it does NOT
+# evaluate the deep path policy. It only:
+#   1. verifies provenance: the PR author is a configured maintenance bot and
+#      the PR targets the protected base branch;
+#   2. asks GitHub to auto-merge the PR.
+#
+# The actual merge authorization is GitHub's branch protection: the PR is
+# merged by GitHub only when ALL required checks (including
+# `maintenance-policy`, which runs the deep policy engine) pass. Enabling
+# auto-merge is not the authorization to merge.
+#
+# Security model:
+# - This job never checks out or executes PR code. It runs on the base
+#   repository context and only talks to the GitHub API.
+# - Human PRs and unknown authors are skipped (exit 0, no auto-merge).
+# - Enabling auto-merge is idempotent: duplicated events are harmless.
+
+name: Maintenance auto-merge
+
+on:
+  workflow_call:
+    inputs:
+      allowed-authors:
+        description: 'Comma-separated bot logins eligible for auto-merge (e.g. dependabot[bot])'
+        type: string
+        required: true
+      base-branch:
+        description: 'Protected base branch the PR must target'
+        type: string
+        default: 'main'
+      strategy:
+        description: 'Merge strategy: squash, merge or rebase'
+        type: string
+        default: 'squash'
+      github-token:
+        description: 'Token with pull-requests:write and contents:write'
+        type: string
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: maintenance-auto-merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify provenance and enable native auto-merge
+        env:
+          GH_TOKEN: ${{ inputs.github-token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          ALLOWED_AUTHORS: ${{ inputs.allowed-authors }}
+          BASE_BRANCH: ${{ inputs.base-branch }}
+          STRATEGY: ${{ inputs.strategy }}
+        run: |
+          set -euo pipefail
+
+          if [ "$PR_DRAFT" = "true" ]; then
+            echo "Draft PR; skipping auto-merge."
+            exit 0
+          fi
+
+          case ",$ALLOWED_AUTHORS," in
+            *",$PR_AUTHOR,"*) ;;
+            *)
+              echo "Author '$PR_AUTHOR' is not a configured maintenance bot; not enabling auto-merge."
+              exit 0
+              ;;
+          esac
+
+          if [ "$PR_BASE" != "$BASE_BRANCH" ]; then
+            echo "PR targets '$PR_BASE', not '$BASE_BRANCH'; not enabling auto-merge."
+            exit 0
+          fi
+
+          case "$STRATEGY" in
+            squash) MERGE_ARGS="--squash" ;;
+            merge) MERGE_ARGS="--merge" ;;
+            rebase) MERGE_ARGS="--rebase" ;;
+            *) echo "::error::Unknown merge strategy '$STRATEGY'"; exit 1 ;;
+          esac
+
+          echo "Enabling native GitHub auto-merge for $PR_URL (author: $PR_AUTHOR)."
+          echo "GitHub will merge only when every required check passes."
+          gh pr merge --auto $MERGE_ARGS "$PR_URL"

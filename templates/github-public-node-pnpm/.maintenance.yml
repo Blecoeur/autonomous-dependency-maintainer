@@ -1,0 +1,65 @@
+schema_version: 1
+
+project:
+  name: your-repo-name
+  ecosystem: node-pnpm
+  base_branch: main
+
+updates:
+  schedule: weekly
+  cooldown_days: 3
+  max_open_prs: 20
+  grouping: individual
+  allow_minor: true
+  allow_patch: true
+  major:
+    default: defer
+    enable_maintenance_audit: true
+    migrate_if_eol_verified: false
+    migrate_if_security_unpatched: true
+
+validation:
+  # Adjust to the real commands of the target repository.
+  install: pnpm install --frozen-lockfile
+  build: pnpm build
+  typecheck: null
+  test: pnpm test
+  smoke: null
+  required_checks:
+    - dependency-ci
+    - maintenance-policy
+
+repair:
+  provider: mistral-workflows
+  enabled: false          # enable after the Phase 3 circuit is deployed
+  max_attempts: 3
+  max_parallel_per_repo: 1
+  max_changed_application_files: 10
+  preserve_public_api: true
+  forbidden_paths:
+    - .github/**
+    - .maintenance.yml
+    - CODEOWNERS
+    - '**/*.test.*'
+    - '**/*.spec.*'
+    - '**/__tests__/**'
+    - '**/__snapshots__/**'
+    - '**/*.snap'
+  # Application paths an AI repair may modify. Empty blocks all application
+  # repairs; declare after reviewing the repository.
+  allowed_ai_paths: []
+
+merge:
+  mode: github-auto-merge
+  strategy: squash
+  allowed_authors:
+    - 'dependabot[bot]'
+  # Add the GitHub App bot login when the AI repair circuit is deployed.
+  ai_authors: []
+
+release:
+  schedule: weekly-sunday
+  versioning: source-aware
+  initial_major: 3
+  publish_github_release: true
+  publish_ghcr: false

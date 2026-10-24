@@ -1,0 +1,140 @@
+# Required maintenance policy check.
+#
+# Evaluates a pull request against the consumer repository's `.maintenance.yml`
+# and the framework policy engine. Designed to be a REQUIRED status check on
+# the protected base branch: policy violations fail the check and visibly
+# block the PR.
+#
+# Trust model:
+# - The configuration is read from the BASE branch (trusted), never from the
+#   PR head, so a PR cannot weaken the rules that apply to itself.
+# - PR facts (author, labels, files, manifests) are collected via the GitHub
+#   API; no PR code is ever checked out or executed in this job.
+# - The framework itself is checked out at a version the consumer pins via
+#   `framework-ref`; never `@main`.
+
+name: Maintenance policy check
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        description: 'Pull request number to evaluate'
+        type: number
+        required: true
+      base-ref:
+        description: 'Base branch of the pull request (trusted source of configuration)'
+        type: string
+        required: true
+      head-sha:
+        description: 'Head SHA of the pull request'
+        type: string
+        required: true
+      framework-repository:
+        description: 'Repository hosting the framework checkout (e.g. your-org/autonomous-dependency-maintainer)'
+        type: string
+        required: true
+      framework-ref:
+        description: 'Pinned framework tag or full commit SHA. Never main.'
+        type: string
+        required: true
+      config-path:
+        description: 'Path to .maintenance.yml on the base branch'
+        type: string
+        default: '.maintenance.yml'
+      node-version:
+        type: string
+        default: '24'
+      pnpm-version:
+        type: string
+        default: '10'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  maintenance-policy:
+    name: maintenance-policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout consumer repository (base branch only, trusted configuration)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base-ref }}
+          # No PR head is checked out. This job never executes repository code.
+
+      - name: Checkout framework (pinned version)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.framework-repository }}
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'pnpm'
+          cache-dependency-path: framework/pnpm-lock.yaml
+
+      - name: Build framework CLI
+        run: |
+          pnpm --dir framework install --frozen-lockfile
+          pnpm --dir framework build
+
+      - name: Collect pull request facts via GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          BASE_REF: ${{ inputs.base-ref }}
+          HEAD_SHA: ${{ inputs.head-sha }}
+        run: |
+          set -euo pipefail
+
+          gh pr view "$PR_NUMBER" --json number,title,author,labels,baseRefName,headRefOid,files > /tmp/pr-raw.json
+
+          jq '{
+            number: .number,
+            title: .title,
+            author: .author.login,
+            authorIsBot: ((.author.login | test("\\[bot\\]$")) == true),
+            baseRef: .baseRefName,
+            headSha: .headRefOid,
+            labels: [.labels[].name],
+            files: [.files[].path],
+            securityUpdate: (([.labels[].name] | index("security")) != null)
+          }' /tmp/pr-raw.json > /tmp/pr-input.json
+
+          # Snapshot every touched package.json (base vs head) so the engine
+          # can detect protected-section changes such as removing the test script.
+          : > /tmp/manifests.ndjson
+          jq -r '.files[] | select(test("(^|/)package\\.json$"))' /tmp/pr-input.json | while IFS= read -r path; do
+            before="$(gh api "repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${BASE_REF}" --jq '.content' 2>/dev/null | tr -d '\n' | base64 -d 2>/dev/null || true)"
+            after="$(gh api "repos/${GITHUB_REPOSITORY}/contents/${path}?ref=${HEAD_SHA}" --jq '.content' 2>/dev/null | tr -d '\n' | base64 -d 2>/dev/null || true)"
+            jq -c -n \
+              --arg path "$path" \
+              --arg before "$before" \
+              --arg after "$after" \
+              '{path: $path, before: (if $before == "" then null else $before end), after: (if $after == "" then null else $after end)}' \
+              >> /tmp/manifests.ndjson
+          done
+
+          jq -s --slurpfile manifests <(jq -s '.' /tmp/manifests.ndjson) '.manifests = $manifests[0]' /tmp/pr-input.json > /tmp/pr-input-full.json
+          mv /tmp/pr-input-full.json /tmp/pr-input.json
+
+          echo "Collected PR input:"
+          jq '{number, author, baseRef, headSha, files, labels}' /tmp/pr-input.json
+
+      - name: Evaluate maintenance policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node framework/dist/cli/check-pr.js \
+            --config "${{ inputs.config-path }}" \
+            --pr /tmp/pr-input.json

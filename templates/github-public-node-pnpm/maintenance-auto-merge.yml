@@ -1,0 +1,35 @@
+# Maintenance auto-merge wrapper for the consumer repository.
+# Install at .github/workflows/maintenance-auto-merge.yml
+#
+# pull_request_target is deliberate: it runs in the trusted base-repository
+# context (write token available even for Dependabot PRs) and this workflow
+# never checks out PR code. The reusable workflow it calls only verifies
+# provenance and enables GitHub's native auto-merge; the merge itself is
+# authorized exclusively by the required checks configured on main.
+#
+# Replace YOUR_ORG and pin the framework to an immutable tag or full SHA.
+
+name: Maintenance auto-merge
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: maintenance-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  auto-merge:
+    uses: YOUR_ORG/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@FRAMEWORK_SHA_OR_TAG
+    with:
+      # Only recognized maintenance bots. GitHub App bots of the AI repair
+      # circuit are added here once deployed.
+      allowed-authors: 'dependabot[bot]'
+      base-branch: main
+      strategy: squash
+      github-token: ${{ github.token }}

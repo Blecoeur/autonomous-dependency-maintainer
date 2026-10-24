@@ -1,0 +1,14 @@
+{
+  "name": "minimal-node-pnpm-example",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal node-pnpm repository used to exercise the autonomous-dependency-maintainer framework end to end.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test src/",
+    "smoke": "node src/smoke.js"
+  }
+}

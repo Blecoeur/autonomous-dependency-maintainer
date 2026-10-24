@@ -1,0 +1,58 @@
+schema_version: 1
+
+project:
+  name: minimal-node-pnpm-example
+  ecosystem: node-pnpm
+  base_branch: main
+
+updates:
+  schedule: weekly
+  cooldown_days: 3
+  max_open_prs: 10
+  grouping: individual
+  allow_minor: true
+  allow_patch: true
+  major:
+    default: defer
+    enable_maintenance_audit: false
+    migrate_if_eol_verified: false
+    migrate_if_security_unpatched: true
+
+validation:
+  install: pnpm install --frozen-lockfile
+  build: null
+  typecheck: null
+  test: pnpm test
+  smoke: pnpm smoke
+  required_checks:
+    - dependency-ci
+    - maintenance-policy
+
+repair:
+  provider: mistral-workflows
+  enabled: false
+  max_attempts: 3
+  max_parallel_per_repo: 1
+  max_changed_application_files: 5
+  preserve_public_api: true
+  forbidden_paths:
+    - .github/**
+    - .maintenance.yml
+    - '**/*.test.*'
+    - '**/__tests__/**'
+  allowed_ai_paths:
+    - 'src/**'
+
+merge:
+  mode: github-auto-merge
+  strategy: squash
+  allowed_authors:
+    - 'dependabot[bot]'
+  ai_authors: []
+
+release:
+  schedule: weekly-sunday
+  versioning: source-aware
+  initial_major: 1
+  publish_github_release: true
+  publish_ghcr: false
