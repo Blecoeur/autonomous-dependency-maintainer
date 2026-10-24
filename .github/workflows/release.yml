@@ -1,0 +1,172 @@
+# Weekly maintenance release (reusable).
+#
+# Computes the release plan from merged-PR evidence collected via the GitHub
+# API, then — only when eligible merges exist since the last published tag —
+# creates the tag, the GitHub Release and attaches a machine-readable
+# provenance file. Idempotent: an existing target tag skips publication.
+#
+# Trust model:
+# - Evidence (tags, merged PRs, files) comes from the GitHub API; the plan is
+#   computed deterministically by the framework CLI from the trusted
+#   base-branch configuration.
+# - No PR code is checked out; only the base branch and the framework are.
+# - Concurrency must be serialized by the consumer wrapper
+#   (concurrency: maintenance-release, cancel-in-progress: false).
+
+name: Weekly maintenance release
+
+on:
+  workflow_call:
+    inputs:
+      framework-repository:
+        type: string
+        required: true
+      framework-ref:
+        description: 'Pinned framework tag or full SHA. Never main.'
+        type: string
+        required: true
+      config-path:
+        type: string
+        default: '.maintenance.yml'
+      base-branch:
+        type: string
+        default: 'main'
+      node-version:
+        type: string
+        default: '24'
+      pnpm-version:
+        type: string
+        default: '10'
+      dry-run:
+        description: 'Compute the plan without publishing anything'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: maintenance-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout consumer repository (base branch, trusted configuration)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base-branch }}
+
+      - name: Checkout framework (pinned version)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.framework-repository }}
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'pnpm'
+          cache-dependency-path: framework/pnpm-lock.yaml
+
+      - name: Build framework CLI
+        run: |
+          pnpm --dir framework install --frozen-lockfile
+          pnpm --dir framework build
+
+      - name: Collect release evidence via GitHub API
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ inputs.base-branch }}
+          FWREF: ${{ inputs.framework-ref }}
+        run: |
+          set -euo pipefail
+
+          # Last published semver tag (highest version, not newest ref).
+          LAST_TAG="$(gh api --paginate "repos/${REPO}/tags?per_page=100" \
+            --jq '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' \
+            | sort -V | tail -1 || true)"
+          if [ -z "${LAST_TAG:-}" ]; then
+            LT=null
+            TAG_DATE="1970-01-01T00:00:00Z"
+            echo "No existing semver tag; starting from the initial major."
+          else
+            LT="\"${LAST_TAG}\""
+            TAG_DATE="$(gh api "repos/${REPO}/commits/${LAST_TAG}" --jq '.commit.committer.date')"
+            echo "Last published tag: ${LAST_TAG} (${TAG_DATE})"
+          fi
+
+          # Merged PRs on the base branch since the last tag date.
+          gh pr list --repo "$REPO" --state merged --base "$BASE" --limit 100 \
+            --json number,title,author,labels,mergedAt \
+            --jq ".[] | select(.mergedAt > \"${TAG_DATE}\")" > /tmp/merged.ndjson
+
+          # Per-PR file lists and merge SHAs (needed for classification).
+          : > /tmp/prs.ndjson
+          while IFS= read -r pr; do
+            N="$(jq -r '.number' <<<"$pr")"
+            gh pr view "$N" --repo "$REPO" --json files,mergeCommit > /tmp/pr-view.json
+            jq -c --slurpfile v /tmp/pr-view.json \
+              '.files = ($v[0].files | map(.path)) | .mergeSha = $v[0].mergeCommit.oid' \
+              <<<"$pr" >> /tmp/prs.ndjson
+          done < /tmp/merged.ndjson
+
+          jq -n \
+            --argjson last_tag "$LT" \
+            --arg repo "$REPO" \
+            --arg fw "$FWREF" \
+            --slurpfile prs /tmp/prs.ndjson \
+            '{last_tag: $last_tag, source_repo: $repo, framework_ref: $fw, merged_prs: $prs[0]}' \
+            > /tmp/release-data.json
+
+          echo "Merged PRs since last tag: $(jq '.merged_prs | length' /tmp/release-data.json)"
+
+      - name: Compute release plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node framework/dist/cli/release.js \
+            --config "${{ inputs.config-path }}" \
+            --data /tmp/release-data.json > /tmp/plan.json
+          jq '{should_release, previous_version, new_version, includes_ai_assisted, prs: [.classified_prs[] | {number, kind}]}' /tmp/plan.json
+
+      - name: Publish release (idempotent)
+        if: ${{ !inputs.dry-run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          SHOULD="$(jq -r '.should_release' /tmp/plan.json)"
+          if [ "$SHOULD" != "true" ]; then
+            echo "No eligible merges since the last tag; no release."
+            exit 0
+          fi
+          TAG="v$(jq -r '.new_version' /tmp/plan.json)"
+          if gh api "repos/${REPO}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; skipping publication (idempotent rerun)."
+            exit 0
+          fi
+          jq -r '.provenance' /tmp/plan.json > provenance.json
+          jq -r '.release_notes_markdown' /tmp/plan.json > notes.md
+          HEAD_SHA="$(git rev-parse HEAD)"
+          gh release create "$TAG" --repo "$REPO" --target "$HEAD_SHA" \
+            --title "$TAG" --notes-file notes.md
+          gh release upload "$TAG" --repo "$REPO" provenance.json
+          echo "::notice::Published release ${TAG} with provenance."
+
+      - name: Dry run notice
+        if: ${{ inputs.dry-run }}
+        run: |
+          SHOULD="$(jq -r '.should_release' /tmp/plan.json)"
+          if [ "$SHOULD" = "true" ]; then
+            echo "Dry run: would publish v$(jq -r '.new_version' /tmp/plan.json)."
+          else
+            echo "Dry run: nothing to publish."
+          fi

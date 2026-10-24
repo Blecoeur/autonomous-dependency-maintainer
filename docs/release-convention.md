@@ -1,8 +1,9 @@
 # Release convention
 
-> Phase 2 — specified, not yet implemented. The version computation
-> (`nextSourceAwareVersion`) and the source-aware semantics are already
-> implemented and unit-tested in the policy engine.
+> Phase 2 — implemented. The reusable workflow is
+> `.github/workflows/release.yml`, the plan computation lives in
+> `src/release/plan.ts` (CLI: `maintenance-release`), and the template wrapper
+> is `templates/github-public-node-pnpm/maintenance-release.yml`.
 
 ## Versioning: `source-aware`
 

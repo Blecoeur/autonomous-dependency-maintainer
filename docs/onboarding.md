@@ -10,6 +10,7 @@ Copy from `templates/github-public-node-pnpm/`:
 | `dependabot.yml` | `.github/dependabot.yml` |
 | `maintenance-ci.yml` | `.github/workflows/maintenance-ci.yml` |
 | `maintenance-auto-merge.yml` | `.github/workflows/maintenance-auto-merge.yml` |
+| `maintenance-release.yml` | `.github/workflows/maintenance-release.yml` |
 
 The templates are pre-filled with the deployed framework
 (`Blecoeur/autonomous-dependency-maintainer`) pinned at `v0.1.0`. When
@@ -76,10 +77,9 @@ pnpm + turbo monorepo, active as of 2026-10-24) builds with
 
 ## Roadmap / not yet implemented
 
-- Weekly release workflow + provenance JSON (Phase 2).
-- AI repair circuit via Mistral Workflows behind `RepairProvider` (Phase 3):
-  the config keys exist and are enforced (all AI repairs are currently
-  rejected unless `allowed_ai_paths` and `ai_authors` are configured), but
-  no provider is wired yet.
+- AI repair circuit via Mistral Workflows behind `RepairProvider` (Phase 3,
+  Python worker): the config keys exist and are enforced (all AI repairs are
+  currently rejected unless `allowed_ai_paths` and `ai_authors` are
+  configured), but no provider is wired yet.
 - Major-version audit reports (Phase 4).
 - Installer CLI that generates the wrapper files (Phase 5).
