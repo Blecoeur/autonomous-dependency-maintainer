@@ -10,9 +10,9 @@
 # Notes:
 # - Cooldown applies to version updates, not security updates. Security
 #   updates may be proposed immediately and still pass the same checks.
-# - github-actions updates touch the trust engine of the repository: they are
-#   deliberately NOT in the auto-merge allowed-authors list and require human
-#   review.
+# - github-actions updates touch the trust engine of the repository: the
+#   policy check surfaces them as needs-human (green check, never
+#   auto-merged); they are merged by human decision only.
 # - For a pnpm monorepo, verify that the root directory covers all manifests;
 #   add `directories:` entries if needed.
 

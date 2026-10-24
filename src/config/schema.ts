@@ -132,6 +132,15 @@ export const PROTECTED_MANIFEST_KEYS: string[] = [
   'pre-commit',
 ];
 
+/**
+ * Paths that constitute CI/Actions infrastructure. A maintenance PR from a
+ * dependency bot whose changed files are ALL inside these paths is a
+ * legitimate infrastructure update (e.g. Dependabot's github-actions
+ * ecosystem): it is surfaced for a human decision (needs-human, never
+ * auto-merged) instead of being rejected as a policy violation.
+ */
+export const INFRASTRUCTURE_UPDATE_PATHS: string[] = ['.github/workflows/**'];
+
 export function defaultConfig(projectName: string, ecosystem: Ecosystem): MaintenanceConfig {
   return {
     schema_version: SCHEMA_VERSION,

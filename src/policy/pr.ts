@@ -64,7 +64,8 @@ export type DecisionReasonCode =
   | 'too-many-application-files'
   | 'ai-repair-disabled'
   | 'major-requires-policy-authorization'
-  | 'no-config-on-base';
+  | 'no-config-on-base'
+  | 'infrastructure-update-needs-human';
 
 export interface PolicyDecision {
   decision: Decision;
