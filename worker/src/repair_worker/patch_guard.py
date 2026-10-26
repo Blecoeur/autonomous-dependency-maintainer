@@ -74,6 +74,24 @@ def manifest_protected_sections_changed(before: str, after: str) -> list[str]:
     return changed
 
 
+def manifest_edit_violations(path: str, current: str, old_text: str, new_text: str) -> list[str]:
+    """Checks a single in-place edit of a manifest for protected-section drift.
+
+    Returns violations when the edit would change any protected key of a
+    package.json (scripts, lint-staged, husky, ...). Unparseable results on
+    either side are violations: the guard never guesses.
+    """
+    if not path.endswith("package.json"):
+        return []
+    if old_text not in current:
+        return [f"edit anchor not found in {path}"]
+    candidate = current.replace(old_text, new_text, 1)
+    return [
+        f"protected manifest section: {path}#{k}"
+        for k in manifest_protected_sections_changed(current, candidate)
+    ]
+
+
 def check_patch(
     changed_paths: list[str],
     manifests_before_after: dict[str, tuple[str | None, str | None]] | None = None,

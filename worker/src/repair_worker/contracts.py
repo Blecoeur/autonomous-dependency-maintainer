@@ -54,6 +54,19 @@ class RepairPolicy(BaseModel):
     max_changed_application_files: int = Field(ge=1, le=100)
 
 
+class RepairCommands(BaseModel):
+    """Verification commands from the consumer's .maintenance.yml.
+
+    `test` is the required oracle: a repair without verification is never
+    accepted. Commands come from the trusted base-branch configuration,
+    never from PR content.
+    """
+
+    install: str | None = None
+    build: str | None = None
+    test: str
+
+
 class RepairRequest(BaseModel):
     schema_version: Literal["1"]
     idempotency_key: str
@@ -62,6 +75,7 @@ class RepairRequest(BaseModel):
     original_pr_number: int
     original_head_sha: str
     dependency_updates: list[DependencyUpdate] = Field(min_length=1)
+    commands: RepairCommands
     ci: CiFacts
     policy: RepairPolicy
 

@@ -52,6 +52,20 @@ describe('evaluateRepairEligibility', () => {
     );
     expect(decision.request?.dependency_updates[0]?.to_version).toBe('2.5.0');
     expect(decision.request?.policy.allow_test_changes).toBe(false);
+    expect(decision.request?.commands.test).toBe('pnpm test');
+    expect(decision.request?.commands.build).toBe('pnpm build');
+  });
+
+  it('refuses repairs when no verification oracle is configured', () => {
+    const decision = evaluateRepairEligibility(
+      makeConfig((c) => {
+        c.validation.test = null;
+        c.validation.smoke = null;
+      }),
+      makeInput(),
+    );
+    expect(decision.reason).toBe('not-a-dependency-pr');
+    expect(decision.details).toContain('verification oracle');
   });
 
   it('refuses when the repair circuit is disabled', () => {

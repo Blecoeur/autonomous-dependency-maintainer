@@ -18,7 +18,7 @@ from pydantic import BaseModel
 
 from repair_worker.contracts import RepairRequest, RepairStatusReport, idempotency_key
 from repair_worker.mistral_client import MistralModelClient
-from repair_worker.repairer import Repairer
+from repair_worker.repairer import AgenticRepairer
 from repair_worker.sandbox import RepairSandbox
 
 
@@ -41,7 +41,7 @@ async def run_repair(request: RepairRequest) -> RepairStatusReport:
     )
     try:
         model = MistralModelClient()
-        repairer = Repairer(request, sandbox, model=model)
+        repairer = AgenticRepairer(request, sandbox, model=model)
         return repairer.run()
     except Exception as err:  # noqa: BLE001 - reported, never crashes the worker
         return RepairStatusReport(
