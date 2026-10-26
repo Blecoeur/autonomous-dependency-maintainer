@@ -19,7 +19,7 @@ export {
   parseVersion,
   updateType,
 } from './policy/semver.js';
-export { DECISION_EXIT_CODES, type Decision, type PolicyDecision, type PrInput } from './policy/pr.js';
+export { DECISION_EXIT_CODES, normalizeAuthorLogin, type Decision, type PolicyDecision, type PrInput } from './policy/pr.js';
 export { adapterFor, type EcosystemAdapter, NodePnpmAdapter } from './providers/ecosystem-node-pnpm/adapter.js';
 export {
   assembleReleasePlan,
