@@ -1,6 +1,6 @@
 {
   "name": "autonomous-dependency-maintainer",
-  "version": "0.1.8",
+  "version": "0.2.0",
   "description": "Reusable GitHub-native framework for automated, policy-driven dependency maintenance: Dependabot + reusable Actions + native auto-merge, with optional AI repair behind a provider interface.",
   "type": "module",
   "license": "MIT",
@@ -12,7 +12,9 @@
   "bin": {
     "maintenance-validate-config": "dist/cli/validate-config.js",
     "maintenance-check-pr": "dist/cli/check-pr.js",
-    "maintenance-release": "dist/cli/release.js"
+    "maintenance-release": "dist/cli/release.js",
+    "maintenance-repair-request": "dist/cli/repair-request.js",
+    "maintenance-repair-submit": "dist/cli/repair-submit.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

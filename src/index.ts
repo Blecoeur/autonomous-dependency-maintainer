@@ -31,3 +31,21 @@ export {
   type ReleaseInputData,
   type ReleasePlan,
 } from './release/plan.js';
+export {
+  evaluateRepairEligibility,
+  type CiRunFacts,
+  type RepairEligibilityDecision,
+  type RepairEligibilityInput,
+  type RepairEligibilityReason,
+  type RepairStateFacts,
+} from './policy/repair-eligibility.js';
+export type { RepairProvider } from './providers/repair/provider.js';
+export {
+  idempotencyKey,
+  REPAIR_STRATEGY_VERSION,
+  type RepairExecution,
+  type RepairRequest,
+  type RepairStatus,
+  type RepairStatusReport,
+} from './providers/repair/types.js';
+export { MistralWorkflowsRepairProvider } from './providers/repair/mistral/adapter.js';

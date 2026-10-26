@@ -1,10 +1,12 @@
 # Mistral Workflows adapter
 
-> Phase 3 — specified, not yet implemented. Do not treat the JSON contracts
-> below as validated APIs; they are framework-owned contracts to be wired to
-> the Mistral Workflows SDK at implementation time, after re-reading the
-> current Mistral documentation (managed deployments were in public preview
-> as of October 2026).
+> Phase 3 — implemented in code, not yet deployed. The contracts live in
+> `src/providers/repair/types.ts` (TS) and `worker/repair_worker/contracts.py`
+> (Python); the adapter is `src/providers/repair/mistral/adapter.ts`; the
+> deterministic guards are `src/policy/repair-eligibility.ts` (CLI:
+> `maintenance-repair-request`); the Python worker is `worker/`. The API
+> shapes follow the Mistral Workflows and mistralai SDK documentation as of
+> October 2026 and must be re-verified at deployment time.
 
 ## Role
 

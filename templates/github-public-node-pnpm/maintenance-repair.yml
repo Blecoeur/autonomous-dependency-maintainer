@@ -1,0 +1,61 @@
+# Repair request wrapper for the consumer repository.
+# Install at .github/workflows/maintenance-repair.yml
+#
+# Listens to completed runs of the repository's CI workflow and calls the
+# framework's repair orchestrator. Every guard (eligible PR, expected
+# workflow, exact head SHA, reproducible failure, no repair in progress,
+# budget) is evaluated inside the trusted workflow; the repository's own
+# code is never executed here.
+#
+# Setup required before this becomes active:
+# - .maintenance.yml: repair.enabled: true (+ reviewed allowed_ai_paths and
+#   ai_authors once the gateway phase is deployed)
+# - Repository secret MISTRAL_API_KEY (+ optional MISTRAL_WORKFLOW_NAME)
+# - A deployed Mistral repair worker (framework repo: worker/)
+
+name: Maintenance repair request
+
+on:
+  workflow_run:
+    # The consumer CI workflow name — adjust to the real name (e.g. 'CI').
+    workflows: ['CI']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr-number:
+        description: 'PR to repair (manual trigger for testing)'
+        type: number
+        required: true
+      head-sha:
+        description: 'Head SHA of the failing PR'
+        type: string
+        required: true
+      run-id:
+        description: 'ID of the failed CI run'
+        type: number
+        required: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: maintenance-repair
+  cancel-in-progress: false
+
+jobs:
+  repair-request:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.pull_requests[0] != null)
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/repair-request.yml@v0.1.8
+    with:
+      pr-number: ${{ github.event_name == 'workflow_dispatch' && inputs.pr-number || github.event.workflow_run.pull_requests[0].number }}
+      base-ref: 'main'
+      head-sha: ${{ github.event_name == 'workflow_dispatch' && inputs.head-sha || github.event.workflow_run.head_sha }}
+      run-id: ${{ github.event_name == 'workflow_dispatch' && inputs.run-id || github.event.workflow_run.id }}
+      expected-workflow-name: 'CI'
+      framework-repository: Blecoeur/autonomous-dependency-maintainer
+      framework-ref: v0.1.8
