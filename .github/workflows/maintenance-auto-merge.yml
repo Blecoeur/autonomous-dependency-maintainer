@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   auto-merge:
-    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.1.8
+    uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/auto-merge.yml@v0.2.0
     with:
       allowed-authors: 'dependabot[bot]'
       base-branch: main
