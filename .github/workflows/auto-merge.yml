@@ -67,6 +67,12 @@ jobs:
             exit 0
           fi
 
+          # gh CLI and some webhook payloads render bot actors as 'app/<slug>';
+          # the policy allowlists use the REST API form '<slug>[bot]'.
+          case "$PR_AUTHOR" in
+            app/*) PR_AUTHOR="${PR_AUTHOR#app/}[bot]" ;;
+          esac
+
           case ",$ALLOWED_AUTHORS," in
             *",$PR_AUTHOR,"*) ;;
             *)

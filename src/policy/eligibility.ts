@@ -10,6 +10,7 @@ import type {
   PolicyDecision,
   PrInput,
 } from './pr.js';
+import { normalizeAuthorLogin } from './pr.js';
 import { adapterFor } from '../providers/ecosystem-node-pnpm/adapter.js';
 
 const AI_ASSISTED_LABEL = 'ai-assisted';
@@ -40,8 +41,9 @@ export function evaluatePr(config: MaintenanceConfig, pr: PrInput): PolicyDecisi
     return build('not-maintenance', 'none', reasons, details, updates);
   }
 
-  const isDependencyBot = config.merge.allowed_authors.includes(pr.author);
-  const isAiBot = config.merge.ai_authors.includes(pr.author);
+  const author = normalizeAuthorLogin(pr.author);
+  const isDependencyBot = config.merge.allowed_authors.includes(author);
+  const isAiBot = config.merge.ai_authors.includes(author);
 
   // 2. Only recognized bot authors can be maintenance PRs. A human PR that
   // merely carries maintenance labels is ignored entirely.

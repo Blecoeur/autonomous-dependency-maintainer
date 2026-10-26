@@ -117,6 +117,36 @@ describe('evaluatePr — dependencies-only circuit', () => {
     expect(decision.reasons).toContain('update-type-unverified');
   });
 
+  it('recognizes gh CLI\'s app/ bot format for allowed authors (live bug)', () => {
+    const decision = evaluatePr(makeConfig(), makePr({ author: 'app/dependabot', authorIsBot: true }));
+    expect(decision.decision).toBe('eligible');
+    expect(decision.classification).toBe('dependencies-only');
+  });
+
+  it('normalizes app/ format for AI authors too', () => {
+    const config = makeConfig((c) => {
+      c.merge.ai_authors = ['maintenance-repairer[bot]'];
+      c.repair.enabled = true;
+      c.repair.allowed_ai_paths = ['src/**'];
+    });
+    const decision = evaluatePr(
+      config,
+      makePr({
+        author: 'app/maintenance-repairer',
+        title: 'Repair compatibility for express 4.19.0',
+        labels: ['maintenance', 'ai-assisted'],
+        files: ['package.json', 'pnpm-lock.yaml', 'src/routes.ts'],
+      }),
+    );
+    expect(decision.decision).toBe('eligible');
+    expect(decision.classification).toBe('ai-assisted');
+  });
+
+  it('does not let app/ formatting grant eligibility to unknown authors', () => {
+    const decision = evaluatePr(makeConfig(), makePr({ author: 'app/someone-else', authorIsBot: true }));
+    expect(decision.decision).toBe('not-maintenance');
+  });
+
   it('ignores a PR targeting another base branch', () => {
     const decision = evaluatePr(makeConfig(), makePr({ baseRef: 'develop' }));
     expect(decision.decision).toBe('not-maintenance');

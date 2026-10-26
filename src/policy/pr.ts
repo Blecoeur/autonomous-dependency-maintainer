@@ -85,3 +85,15 @@ export const DECISION_EXIT_CODES: Record<Decision, number> = {
   'needs-human': 0,
   rejected: 1,
 };
+
+/**
+ * Normalizes bot actor logins across GitHub surface formats. The REST API
+ * reports bots as `<slug>[bot]` (e.g. `dependabot[bot]`), while gh CLI's
+ * JSON output renders the same actor as `app/<slug>` (e.g.
+ * `app/dependabot`). Human logins never contain a slash, so the rewrite is
+ * unambiguous. Applied to the PR author before any allowlist comparison.
+ */
+export function normalizeAuthorLogin(login: string): string {
+  const match = /^app\/([A-Za-z0-9][A-Za-z0-9-]*)$/.exec(login);
+  return match ? `${match[1]}[bot]` : login;
+}
