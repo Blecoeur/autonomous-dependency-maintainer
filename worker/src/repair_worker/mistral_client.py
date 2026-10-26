@@ -17,14 +17,15 @@ from .repairer import ModelTurn, ToolCall
 
 
 class MistralModelClient:
-    def __init__(self, model_name: str = "devstral-latest", api_key_env: str = "MISTRAL_API_KEY"):
+    def __init__(self, model_name: str | None = None, api_key_env: str = "MISTRAL_API_KEY"):
         from mistralai import Mistral  # imported lazily: provider dependency
 
         api_key = os.environ.get(api_key_env)
         if not api_key:
             raise RuntimeError(f"{api_key_env} is not set; the worker cannot call the model")
         self.client = Mistral(api_key=api_key)
-        self.model_name = model_name
+        # REPAIR_MODEL_NAME overrides the default at deployment time.
+        self.model_name = model_name or os.environ.get("REPAIR_MODEL_NAME", "mistral-large-4")
 
     def turn(
         self,
