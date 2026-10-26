@@ -1,0 +1,170 @@
+# Repair request orchestrator (reusable, P3).
+#
+# Trusted job: listens (via the consumer's wrapper) to completed CI runs,
+# verifies ALL deterministic guards (spec 7.1) through the framework CLI,
+# and only then submits the repair to the Mistral provider.
+#
+# Trust model:
+# - No PR code is ever checked out or executed in this job.
+# - The configuration comes from the base branch; the PR facts and CI run
+#   facts come from the GitHub API.
+# - Secrets (MISTRAL_API_KEY) are only read when every guard has passed;
+#   they are never exposed to repository code.
+# - Without the Mistral secret the job reports eligibility and exits 0:
+#   an explicit, visible block instead of a silent skip (spec rule 10).
+#
+# NOT included in this workflow (gateway phase, deployed separately):
+# creating the replacement PR from the worker's patch — done by a
+# GitHub App after re-validation with the policy engine.
+
+name: Repair request
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        type: number
+        required: true
+      base-ref:
+        type: string
+        required: true
+      head-sha:
+        type: string
+        required: true
+      run-id:
+        type: number
+        required: true
+      expected-workflow-name:
+        description: 'The consumer CI workflow name that may trigger repairs'
+        type: string
+        required: true
+      framework-repository:
+        type: string
+        required: true
+      framework-ref:
+        type: string
+        required: true
+      config-path:
+        type: string
+        default: '.maintenance.yml'
+      base-branch:
+        type: string
+        default: 'main'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  repair-request:
+    name: maintenance-repair-request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout consumer repository (base branch, trusted configuration)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.base-branch }}
+
+      - name: Checkout framework (pinned version)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.framework-repository }}
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: framework/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: framework/pnpm-lock.yaml
+
+      - name: Build framework CLI
+        run: |
+          pnpm --dir framework install --frozen-lockfile
+          pnpm --dir framework build
+
+      - name: Collect PR, CI and repair-state facts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ inputs.pr-number }}
+          HEAD_SHA: ${{ inputs.head-sha }}
+          RUN_ID: ${{ inputs.run-id }}
+          EXPECTED_WORKFLOW: ${{ inputs.expected-workflow-name }}
+        run: |
+          set -euo pipefail
+
+          gh pr view "$PR_NUMBER" --repo "$REPO" --json number,title,author,labels,baseRefName,headRefOid,files > /tmp/pr.json
+          jq '{
+            number: .number,
+            title: .title,
+            author: .author.login,
+            authorIsBot: ((.author.login | test("\\[bot\\]$")) == true),
+            baseRef: .baseRefName,
+            headSha: .headRefOid,
+            labels: [.labels[].name],
+            files: [.files[].path],
+            securityUpdate: (([.labels[].name] | index("security")) != null)
+          }' /tmp/pr.json > /tmp/pr-input.json
+
+          # CI run facts + latest-run check for the exact head SHA.
+          gh api "repos/${REPO}/actions/runs/${RUN_ID}" > /tmp/run.json
+          LATEST_ID="$(gh api "repos/${REPO}/actions/runs?head_sha=${HEAD_SHA}&per_page=100" \
+            --jq "[.workflow_runs[] | select(.name == \"${EXPECTED_WORKFLOW}\")] | max_by(.id) | .id")"
+          jq --argjson run_id "$RUN_ID" --arg name "$(jq -r .name /tmp/run.json)" \
+            --arg conclusion "$(jq -r .conclusion /tmp/run.json)" \
+            --arg head_sha "$(jq -r .head_sha /tmp/run.json)" \
+            --argjson is_latest "$([[ "${LATEST_ID}" == "$RUN_ID" ]] && echo true || echo false)" \
+            '{run_id: $run_id, workflow_name: $name, conclusion: $conclusion, head_sha: $head_sha, is_latest_run: $is_latest}' \
+            > /tmp/ci.json
+
+          # Repair state: replacement PRs are marked with the idempotency key
+          # in their body by the gateway.
+          KEY="$(jq -r --arg repo "$REPO" '${repo}#' + (.number|tostring) + "@" + .headSha + ":repair-v1" /tmp/pr-input.json)"
+          gh pr list --repo "$REPO" --state all --limit 300 --json number,state,title,body \
+            --jq "[.[] | select(.body // \"\" | contains(\"${KEY}\")) | {number, state}]" > /tmp/repairs.json
+          jq --slurpfile repairs /tmp/repairs.json \
+            '{repair_in_progress: ($repairs[0] | any(.state == "OPEN")), attempts_used: ($repairs[0] | length)}' \
+            > /tmp/state.json
+
+          echo "Repair state:"; cat /tmp/state.json
+
+      - name: Evaluate repair eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED_WORKFLOW: ${{ inputs.expected-workflow-name }}
+        run: |
+          set -euo pipefail
+          node framework/dist/cli/repair-request.js \
+            --config "${{ inputs.config-path }}" \
+            --pr /tmp/pr-input.json \
+            --ci /tmp/ci.json \
+            --state /tmp/state.json \
+            --repo "$REPO" \
+            --expected-workflow "$EXPECTED_WORKFLOW" > /tmp/decision.json
+          jq '{eligible: .eligible, reason: .reason, details: .details, idempotency_key: .idempotency_key}' /tmp/decision.json
+
+      - name: Submit to the repair provider (guarded by secrets)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MISTRAL_WORKFLOW_NAME: ${{ secrets.MISTRAL_WORKFLOW_NAME }}
+        run: |
+          set -euo pipefail
+          if ! jq -e '.eligible' /tmp/decision.json > /dev/null; then
+            echo "Not eligible; nothing submitted."
+            exit 0
+          fi
+          if [ -z "${MISTRAL_API_KEY:-}" ]; then
+            echo "::notice::Repair eligible, but MISTRAL_API_KEY is not configured in this repository. Not submitting (explicit block)."
+            exit 0
+          fi
+          jq '.request' /tmp/decision.json > /tmp/request.json
+          node framework/dist/cli/repair-submit.js /tmp/request.json > /tmp/execution.json
+          echo "Submitted repair execution:"; cat /tmp/execution.json

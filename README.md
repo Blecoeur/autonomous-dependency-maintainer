@@ -106,8 +106,12 @@ license).
 
 ## Roadmap
 
-- Phase 3 (next): `RepairProvider` interface, Mistral Workflows adapter
-  (Python worker), GitHub App for replacement PRs, isolated repair sandbox.
+- Phase 3 (in progress): the `RepairProvider` interface, Mistral Workflows
+  adapter, deterministic repair guards, the Python repair worker
+  (`worker/`) and the repair-request orchestrator are implemented and
+  tested; remaining: deploy the worker on Mistral, create the GitHub App
+  gateway that opens replacement PRs from validated patches, then enable
+  `repair` in consumer configs.
 - Phase 4: major-version audit circuit (`deferred` / `migration-required` /
   `unknown` reports).
 - Phase 5: installer CLI, second-ecosystem adapters.
