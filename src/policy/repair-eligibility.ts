@@ -123,6 +123,14 @@ export function evaluateRepairEligibility(
     );
   }
 
+  const testOracle = config.validation.test ?? config.validation.smoke;
+  if (!testOracle) {
+    return refuse(
+      'not-a-dependency-pr',
+      'No test or smoke command configured; a repair without a verification oracle is never accepted.',
+    );
+  }
+
   const request: RepairRequest = {
     schema_version: '1',
     idempotency_key: key,
@@ -136,6 +144,11 @@ export function evaluateRepairEligibility(
       to_version: u.toVersion,
       update_type: u.updateType,
     })),
+    commands: {
+      install: config.validation.install,
+      build: config.validation.build,
+      test: testOracle,
+    },
     ci: {
       run_id: input.ci.run_id,
       workflow_name: input.ci.workflow_name,

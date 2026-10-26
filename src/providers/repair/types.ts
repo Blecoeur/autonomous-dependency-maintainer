@@ -22,6 +22,13 @@ export interface RepairRequest {
     to_version: string;
     update_type: 'major' | 'minor' | 'patch';
   }>;
+  /** Verification commands from the consumer's .maintenance.yml (validation section). */
+  commands: {
+    install: string | null;
+    build: string | null;
+    /** The test oracle; required — a repair without verification is never accepted. */
+    test: string;
+  };
   ci: {
     run_id: number;
     workflow_name: string;
