@@ -29,7 +29,9 @@ jobs:
         run: pnpm test
       - name: Python worker tests
         working-directory: worker
-        run: python3 -m unittest discover -s tests -v
+        run: |
+          python3 -m pip install --quiet --disable-pip-version-check pydantic
+          python3 -m unittest discover -s tests -v
       - name: Validate shipped example configs
         run: |
           node dist/cli/validate-config.js templates/github-public-node-pnpm/.maintenance.yml
