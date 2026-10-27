@@ -4,14 +4,17 @@
 # Listens to completed runs of the repository's CI workflow and calls the
 # framework's repair orchestrator. Every guard (eligible PR, expected
 # workflow, exact head SHA, reproducible failure, no repair in progress,
-# budget) is evaluated inside the trusted workflow; the repository's own
-# code is never executed here.
+# budget) is evaluated inside the trusted workflow; the repair itself runs
+# the Mistral vibe CLI on a GitHub Actions runner, and the repository's own
+# code only ever executes inside the repair workspace with a scrubbed
+# environment.
 #
 # Setup required before this becomes active:
-# - .maintenance.yml: repair.enabled: true (+ reviewed allowed_ai_paths and
-#   ai_authors once the gateway phase is deployed)
-# - Repository secret MISTRAL_API_KEY (+ optional MISTRAL_WORKFLOW_NAME)
-# - A deployed Mistral repair worker (framework repo: worker/)
+# - .maintenance.yml: repair.enabled: true, provider: vibe (+ reviewed
+#   allowed_ai_paths and ai_authors once the gateway phase is deployed)
+# - Repository secrets MISTRAL_API_KEY and GITHUB_READ_TOKEN (read-only;
+#   used only to clone the PR head into the repair workspace)
+# - A published framework ref (framework-ref below)
 
 name: Maintenance repair request
 
@@ -51,6 +54,9 @@ jobs:
        github.event.workflow_run.event == 'pull_request' &&
        github.event.workflow_run.pull_requests[0] != null)
     uses: Blecoeur/autonomous-dependency-maintainer/.github/workflows/repair-request.yml@v0.2.0
+    secrets:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
     with:
       pr-number: ${{ github.event_name == 'workflow_dispatch' && inputs.pr-number || github.event.workflow_run.pull_requests[0].number }}
       base-ref: 'main'

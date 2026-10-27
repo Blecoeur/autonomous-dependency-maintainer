@@ -1,20 +1,23 @@
-# Repair request orchestrator (reusable, P3).
+# Repair orchestrator (reusable, P3).
 #
 # Trusted job: listens (via the consumer's wrapper) to completed CI runs,
 # verifies ALL deterministic guards (spec 7.1) through the framework CLI,
-# and only then submits the repair to the Mistral provider.
+# then runs ONE repair attempt with the Mistral vibe CLI directly on this
+# runner and re-validates the produced patch with the policy engine.
 #
 # Trust model:
-# - No PR code is ever checked out or executed in this job.
-# - The configuration comes from the base branch; the PR facts and CI run
-#   facts come from the GitHub API.
-# - Secrets (MISTRAL_API_KEY) are only read when every guard has passed;
-#   they are never exposed to repository code.
-# - Without the Mistral secret the job reports eligibility and exits 0:
-#   an explicit, visible block instead of a silent skip (spec rule 10).
+# - The guard job never checks out PR code. The repair job checks out the
+#   PR head SHA — that code is untrusted and is only ever executed inside
+#   the repair workspace with a scrubbed environment.
+# - Both jobs run with a read-only token (contents: read,
+#   pull-requests: read). The agent never holds GitHub write credentials;
+#   MISTRAL_API_KEY and GITHUB_READ_TOKEN never reach repository commands.
+# - Secrets are only read when every guard has passed; without
+#   MISTRAL_API_KEY the repair job reports eligibility and exits 0: an
+#   explicit, visible block instead of a silent skip (spec rule 10).
 #
 # NOT included in this workflow (gateway phase, deployed separately):
-# creating the replacement PR from the worker's patch — done by a
+# creating the replacement PR from the validated patch — done by a
 # GitHub App after re-validation with the policy engine.
 
 name: Repair request
@@ -50,16 +53,25 @@ on:
       base-branch:
         type: string
         default: 'main'
+    secrets:
+      MISTRAL_API_KEY:
+        required: false
+      GITHUB_READ_TOKEN:
+        required: false
 
 permissions:
   contents: read
   pull-requests: read
 
 jobs:
-  repair-request:
-    name: maintenance-repair-request
+  guards:
+    name: maintenance-repair-guards
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      eligible: ${{ steps.decision.outputs.eligible }}
+      idempotency-key: ${{ steps.decision.outputs.idempotency-key }}
+      request: ${{ steps.decision.outputs.request }}
     steps:
       - name: Checkout consumer repository (base branch, trusted configuration)
         uses: actions/checkout@v4
@@ -135,6 +147,7 @@ jobs:
           echo "Repair state:"; cat /tmp/state.json
 
       - name: Evaluate repair eligibility
+        id: decision
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -149,22 +162,89 @@ jobs:
             --repo "$REPO" \
             --expected-workflow "$EXPECTED_WORKFLOW" > /tmp/decision.json
           jq '{eligible: .eligible, reason: .reason, details: .details, idempotency_key: .idempotency_key}' /tmp/decision.json
+          {
+            echo "eligible=$(jq -r .eligible /tmp/decision.json)"
+            echo "idempotency-key=$(jq -r .idempotency_key /tmp/decision.json)"
+            echo "request<<EOF"
+            jq -c '.request' /tmp/decision.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
-      - name: Submit to the repair provider (guarded by secrets)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-          MISTRAL_WORKFLOW_NAME: ${{ secrets.MISTRAL_WORKFLOW_NAME }}
+  repair:
+    name: maintenance-repair-run
+    needs: guards
+    if: needs.guards.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+      GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
+    steps:
+      - name: Check provider secret (explicit block, never a silent skip)
         run: |
-          set -euo pipefail
-          if ! jq -e '.eligible' /tmp/decision.json > /dev/null; then
-            echo "Not eligible; nothing submitted."
-            exit 0
-          fi
           if [ -z "${MISTRAL_API_KEY:-}" ]; then
-            echo "::notice::Repair eligible, but MISTRAL_API_KEY is not configured in this repository. Not submitting (explicit block)."
+            echo "::notice::Repair eligible, but MISTRAL_API_KEY is not configured in this repository. Not running (explicit block)."
             exit 0
           fi
-          jq '.request' /tmp/decision.json > /tmp/request.json
-          node framework/dist/cli/repair-submit.js /tmp/request.json > /tmp/execution.json
-          echo "Submitted repair execution:"; cat /tmp/execution.json
+
+      - name: Checkout framework (pinned version)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.framework-repository }}
+          ref: ${{ inputs.framework-ref }}
+          path: framework
+
+      - name: Checkout consumer configuration (base branch, trusted)
+        uses: actions/checkout@v4
+        with:
+          path: config
+          ref: ${{ inputs.base-branch }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: framework/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: framework/pnpm-lock.yaml
+
+      - name: Install pnpm
+        run: corepack enable && corepack prepare pnpm@10.32.1 --activate
+
+      - name: Install uv (pinned vibe CLI launcher)
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build framework CLI
+        run: |
+          pnpm --dir framework install --frozen-lockfile
+          pnpm --dir framework build
+
+      - name: Run the repair attempt (vibe on the runner)
+        env:
+          REPAIR_PATCH_FILE: /tmp/repair.patch
+          # Passed through the environment, never interpolated into the
+          # script: the request JSON is data, not shell.
+          REPAIR_REQUEST: ${{ needs.guards.outputs.request }}
+        run: |
+          set -uo pipefail
+          printf '%s' "$REPAIR_REQUEST" > /tmp/request.json
+          node framework/dist/cli/repair-run.js \
+            --config "config/${{ inputs.config-path }}" \
+            /tmp/request.json > /tmp/report.json
+          echo "Repair report:"; cat /tmp/report.json
+
+      - name: Upload the validated patch (consumed by the gateway)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repair-patch-${{ needs.guards.outputs.idempotency-key }}
+          path: /tmp/repair.patch
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,3 +1,0 @@
-# Python repair worker for the autonomous-dependency-maintainer framework.
-# Python 3.11+; the core (contracts, guard, loop) is stdlib-only.
-mistralai>=1.0.0

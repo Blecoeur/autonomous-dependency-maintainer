@@ -27,7 +27,7 @@ const MAJOR_POLICIES: MajorPolicy[] = ['defer', 'allow'];
 const MERGE_MODES: MergeMode[] = ['github-auto-merge'];
 const MERGE_STRATEGIES: MergeStrategy[] = ['squash', 'merge', 'rebase'];
 const VERSIONING_MODES: VersioningMode[] = ['source-aware', 'semver'];
-const REPAIR_PROVIDERS: RepairProviderName[] = ['mistral-workflows', 'none', 'mock'];
+const REPAIR_PROVIDERS: RepairProviderName[] = ['vibe', 'none', 'mock'];
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);

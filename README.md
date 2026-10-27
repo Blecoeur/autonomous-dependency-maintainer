@@ -17,8 +17,9 @@ Design contract: [AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md](../AUTONOMOUS_DEPEN
   green — the merge is authorized by GitHub's required checks, not by a model.
 - **Explicit blocking**: majors, unverifiable updates, test weakening, and CI
   workflow changes stay visible instead of being silently merged.
-- An optional, not-yet-implemented **AI repair circuit** behind a
-  `RepairProvider` interface (Mistral Workflows adapter planned in Phase 3).
+- An optional, not-yet-deployed **AI repair circuit** behind a
+  `RepairProvider` interface (Mistral vibe CLI run on the GitHub Actions
+  runner in Phase 3).
 
 ## Status
 
@@ -106,12 +107,12 @@ license).
 
 ## Roadmap
 
-- Phase 3 (in progress): the `RepairProvider` interface, Mistral Workflows
-  adapter, deterministic repair guards, the Python repair worker
-  (`worker/`) and the repair-request orchestrator are implemented and
-  tested; remaining: deploy the worker on Mistral, create the GitHub App
-  gateway that opens replacement PRs from validated patches, then enable
-  `repair` in consumer configs.
+- Phase 3 (in progress): the `RepairProvider` interface, the Mistral vibe
+  CLI provider running on the GitHub Actions runner, deterministic repair
+  guards, patch validation and the repair-request orchestrator are
+  implemented and tested; remaining: create the GitHub App gateway that
+  opens replacement PRs from validated patches, then enable `repair` in
+  consumer configs.
 - Phase 4: major-version audit circuit (`deferred` / `migration-required` /
   `unknown` reports).
 - Phase 5: installer CLI, second-ecosystem adapters.

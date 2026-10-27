@@ -12,7 +12,7 @@ export type MajorPolicy = 'defer' | 'allow';
 export type MergeMode = 'github-auto-merge';
 export type MergeStrategy = 'squash' | 'merge' | 'rebase';
 export type VersioningMode = 'source-aware' | 'semver';
-export type RepairProviderName = 'mistral-workflows' | 'none' | 'mock';
+export type RepairProviderName = 'vibe' | 'none' | 'mock';
 
 export interface MajorConfig {
   /** Ordinary major updates are never merged automatically when 'defer'. */
@@ -172,7 +172,7 @@ export function defaultConfig(projectName: string, ecosystem: Ecosystem): Mainte
       required_checks: ['dependency-ci', 'maintenance-policy'],
     },
     repair: {
-      provider: 'mistral-workflows',
+      provider: 'vibe',
       enabled: true,
       max_attempts: 3,
       max_parallel_per_repo: 1,
