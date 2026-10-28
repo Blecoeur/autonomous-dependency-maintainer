@@ -43,9 +43,19 @@ export type { RepairProvider } from './providers/repair/provider.js';
 export {
   idempotencyKey,
   REPAIR_STRATEGY_VERSION,
-  type RepairExecution,
   type RepairRequest,
   type RepairStatus,
   type RepairStatusReport,
 } from './providers/repair/types.js';
-export { MistralWorkflowsRepairProvider } from './providers/repair/mistral/adapter.js';
+export { MockRepairProvider } from './providers/repair/mock/adapter.js';
+export { validatePatch, type PatchValidation, type ValidatePatchOptions } from './providers/repair/patch-validation.js';
+export { VibeRepairProvider, type VibeRepairProviderOptions } from './providers/repair/vibe/provider.js';
+export { buildRepairPrompt, repairSystemPrompt } from './providers/repair/vibe/prompt.js';
+export {
+  renderVibeConfig,
+  writeVibeHome,
+  DEFAULT_VIBE_CONFIG,
+  REPAIR_SYSTEM_PROMPT_ID,
+  type VibeRunConfig,
+} from './providers/repair/vibe/config.js';
+export { RepairWorkspace, scrubbedEnv, type CommandOutcome } from './providers/repair/vibe/sandbox.js';

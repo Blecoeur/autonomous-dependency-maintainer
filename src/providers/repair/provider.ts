@@ -1,13 +1,12 @@
-import type { RepairExecution, RepairRequest, RepairStatusReport } from './types.js';
+import type { RepairRequest, RepairStatusReport } from './types.js';
 
 /**
  * Interface between the trusted orchestrator and any repair provider.
- * Phase 3 ships a Mistral Workflows adapter and a deterministic mock for
- * tests; the framework core never depends on either directly.
+ * Phase 3 ships the vibe CLI provider (agent runs on the CI runner) and a
+ * deterministic mock for tests; the framework core never depends on either
+ * directly.
  */
 export interface RepairProvider {
-  /** Submit a repair; replays with the same idempotency key return the same execution. */
-  submit(request: RepairRequest): Promise<RepairExecution>;
-  /** Poll the status of a submitted repair. */
-  status(executionId: string): Promise<RepairStatusReport>;
+  /** Run one repair attempt to completion and return its report. */
+  run(request: RepairRequest): Promise<RepairStatusReport>;
 }

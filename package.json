@@ -14,12 +14,13 @@
     "maintenance-check-pr": "dist/cli/check-pr.js",
     "maintenance-release": "dist/cli/release.js",
     "maintenance-repair-request": "dist/cli/repair-request.js",
-    "maintenance-repair-submit": "dist/cli/repair-submit.js"
+    "maintenance-repair-run": "dist/cli/repair-run.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist",
+    "src/providers/repair/skill",
     "templates"
   ],
   "scripts": {

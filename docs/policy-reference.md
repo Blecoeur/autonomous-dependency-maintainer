@@ -53,7 +53,7 @@ enforcement itself lives in GitHub settings.
 
 | key | type | default |
 |---|---|---|
-| `provider` | `mistral-workflows` \| `none` \| `mock` | `mistral-workflows` |
+| `provider` | `vibe` \| `none` \| `mock` | `vibe` |
 | `enabled` | bool | `true` |
 | `max_attempts` | int 1–10 | `3` |
 | `max_parallel_per_repo` | int 1–10 | `1` |

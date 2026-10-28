@@ -29,7 +29,7 @@ validation:
     - maintenance-policy
 
 repair:
-  provider: mistral-workflows
+  provider: vibe
   enabled: false
   max_attempts: 3
   max_parallel_per_repo: 1
