@@ -12,8 +12,12 @@
 # auto-merge is not the authorization to merge.
 #
 # Security model:
-# - This job never checks out or executes PR code. It runs on the base
-#   repository context and only talks to the GitHub API.
+# - The auto-merge job never checks out or executes PR code. It runs on the
+#   base repository context and only talks to the GitHub API.
+# - The lockfile-repair job DOES check out the PR head, but never executes
+#   PR code: pnpm runs with --lockfile-only --ignore-scripts (registry
+#   metadata only, no lifecycle scripts, nothing extracted to node_modules).
+#   The job has no access to secrets beyond github.token.
 # - Human PRs and unknown authors are skipped (exit 0, no auto-merge).
 # - Enabling auto-merge is idempotent: duplicated events are harmless.
 
@@ -34,14 +38,147 @@ on:
         description: 'Merge strategy: squash, merge or rebase'
         type: string
         default: 'squash'
+      lockfile-path:
+        description: 'Lockfile the repair step may regenerate (pnpm). Empty disables the repair step.'
+        type: string
+        default: 'pnpm-lock.yaml'
+      pnpm-version:
+        description: 'pnpm version used to regenerate the lockfile. Empty reads packageManager from the PR head, fallback latest v10.'
+        type: string
+        default: ''
 
 permissions:
   contents: write
   pull-requests: write
 
 jobs:
+  lockfile-repair:
+    name: lockfile-repair
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Verify provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+          ALLOWED_AUTHORS: ${{ inputs.allowed-authors }}
+          BASE_BRANCH: ${{ inputs.base-branch }}
+          LOCKFILE_PATH: ${{ inputs.lockfile-path }}
+        run: |
+          set -euo pipefail
+          if [ -z "$LOCKFILE_PATH" ]; then
+            echo "Lockfile repair disabled (empty lockfile-path)."
+            exit 0
+          fi
+          if [ "$PR_DRAFT" = "true" ]; then
+            echo "Draft PR; skipping lockfile repair."
+            exit 0
+          fi
+          case "$PR_AUTHOR" in
+            app/*) PR_AUTHOR="${PR_AUTHOR#app/}[bot]" ;;
+          esac
+          case ",$ALLOWED_AUTHORS," in
+            *",$PR_AUTHOR,"*) ;;
+            *)
+              echo "Author '$PR_AUTHOR' is not a configured maintenance bot; skipping lockfile repair."
+              exit 0
+              ;;
+          esac
+          if [ "$PR_BASE" != "$BASE_BRANCH" ]; then
+            echo "PR targets '$PR_BASE', not '$BASE_BRANCH'; skipping lockfile repair."
+            exit 0
+          fi
+          if gh pr view "$PR_URL" --json files --jq '.files[].path' | grep -qx "$LOCKFILE_PATH"; then
+            echo "repair-needed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "PR does not touch $LOCKFILE_PATH; nothing to repair."
+            echo "repair-needed=false" >> "$GITHUB_OUTPUT"
+          fi
+        id: files
+
+      - name: Check out the PR head
+        if: steps.files.outputs.repair-needed == 'true'
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        if: steps.files.outputs.repair-needed == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ inputs.pnpm-version }}
+          run_install: false
+
+      - name: Set up Node
+        if: steps.files.outputs.repair-needed == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Merge the base branch into the PR head
+        if: steps.files.outputs.repair-needed == 'true'
+        env:
+          LOCKFILE_PATH: ${{ inputs.lockfile-path }}
+          BASE_BRANCH: ${{ inputs.base-branch }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$BASE_BRANCH"
+          if git merge --no-edit "origin/$BASE_BRANCH"; then
+            echo "Base merged cleanly."
+          else
+            # Only lockfile conflicts are repairable here: take our side and
+            # let the regeneration step rebuild a consistent lockfile.
+            unmerged=$(git diff --name-only --diff-filter=U)
+            if [ "$unmerged" = "$LOCKFILE_PATH" ]; then
+              git checkout --ours -- "$LOCKFILE_PATH"
+              git add "$LOCKFILE_PATH"
+              # `git merge --continue` rejects --no-edit; commit completes the merge.
+              GIT_EDITOR=true git commit --no-edit
+              echo "Lockfile conflict resolved by regeneration."
+            else
+              git merge --abort
+              echo "::warning::PR conflicts with $BASE_BRANCH beyond $LOCKFILE_PATH; leaving it to a human."
+              exit 0
+            fi
+          fi
+
+      - name: Regenerate the lockfile with the pinned pnpm
+        if: steps.files.outputs.repair-needed == 'true'
+        run: |
+          set -euo pipefail
+          # Dependabot's lockfile updater can drop the overrides: section,
+          # which makes `pnpm install --frozen-lockfile` fail. Regenerate
+          # with the real pnpm so the lockfile matches package.json again.
+          pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
+          # The repaired lockfile must satisfy the same check CI runs.
+          pnpm install --frozen-lockfile --lockfile-only --ignore-scripts
+
+      - name: Push the repaired branch
+        if: steps.files.outputs.repair-needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Lockfile already consistent; nothing to push."
+            exit 0
+          fi
+          git commit -m "chore: regenerate pnpm-lock.yaml with the pinned pnpm" \
+            -m "Dependabot's lockfile update dropped the overrides: section, which made pnpm install --frozen-lockfile fail and blocked the required CI check. Regenerated with pnpm so the lockfile is consistent again."
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:$HEAD_REF"
+          echo "Pushed repaired lockfile to $HEAD_REF."
+
   auto-merge:
     name: maintenance-auto-merge
+    needs: lockfile-repair
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
