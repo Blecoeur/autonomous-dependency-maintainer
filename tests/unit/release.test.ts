@@ -25,13 +25,19 @@ function mergedPr(overrides?: Partial<MergedPr>): MergedPr {
 }
 
 function data(overrides?: Partial<ReleaseInputData>): ReleaseInputData {
-  return {
+  const d: ReleaseInputData = {
     last_tag: 'v3.2.1',
     source_repo: 'Blecoeur/keelflow-auto-maintained',
     framework_ref: 'v0.1.3',
     merged_prs: [],
     ...overrides,
   };
+  // By default, every collected PR is new since the last tag (merge SHAs
+  // not yet contained in it), matching what the workflow passes.
+  if (d.last_tag !== null && d.new_merge_shas === undefined) {
+    d.new_merge_shas = d.merged_prs.map((p) => p.mergeSha);
+  }
+  return d;
 }
 
 describe('assembleReleasePlan — versioning', () => {
@@ -176,6 +182,47 @@ describe('assembleReleasePlan — determinism and idempotence', () => {
     const config = makeConfig();
     const input = data({ merged_prs: [mergedPr()] });
     expect(assembleReleasePlan(config, input)).toEqual(assembleReleasePlan(config, input));
+  });
+
+  it('produces no release on a rerun whose merges are all already in the last tag (12.2 case 9)', () => {
+    // Regression: v3.2.5 and v3.2.6 were published on the same commit as
+    // v3.2.4 because the last merged PR was re-counted by a date comparison.
+    const plan = assembleReleasePlan(
+      makeConfig(),
+      data({
+        last_tag: 'v3.2.4',
+        merged_prs: [mergedPr({ number: 14, mergeSha: 'already-released' })],
+        new_merge_shas: [],
+      }),
+    );
+    expect(plan.should_release).toBe(false);
+    expect(plan.classified_prs).toHaveLength(0);
+    expect(plan.provenance.merged_prs).toHaveLength(0);
+  });
+
+  it('counts only the PRs whose merge SHA is new since the last tag', () => {
+    const plan = assembleReleasePlan(
+      makeConfig(),
+      data({
+        merged_prs: [
+          mergedPr({ number: 14, mergeSha: 'already-released' }),
+          mergedPr({ number: 15, mergeSha: 'brand-new', title: 'Bump zod from 3.22.0 to 3.23.0' }),
+        ],
+        new_merge_shas: ['brand-new'],
+      }),
+    );
+    expect(plan.should_release).toBe(true);
+    expect(plan.classified_prs.map((p) => p.number)).toEqual([15]);
+    expect(plan.new_version).toBe('3.2.2');
+  });
+
+  it('treats every merged PR as new when there is no last tag yet', () => {
+    const plan = assembleReleasePlan(
+      makeConfig(),
+      data({ last_tag: null, new_merge_shas: [], merged_prs: [mergedPr()] }),
+    );
+    expect(plan.should_release).toBe(true);
+    expect(plan.classified_prs).toHaveLength(1);
   });
 
   it('rejects a non source-aware versioning mode explicitly', () => {

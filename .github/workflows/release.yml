@@ -1,9 +1,11 @@
 # Weekly maintenance release (reusable).
 #
 # Computes the release plan from merged-PR evidence collected via the GitHub
-# API, then — only when eligible merges exist since the last published tag —
-# creates the tag, the GitHub Release and attaches a machine-readable
-# provenance file. Idempotent: an existing target tag skips publication.
+# API, then — only when merges not yet covered by the last published tag
+# exist (decided by merge-SHA ancestry, not timestamps) — creates the tag,
+# the GitHub Release and attaches a machine-readable provenance file.
+# Idempotent: a rerun without new merges publishes nothing, and an existing
+# target tag skips publication.
 #
 # Trust model:
 # - Evidence (tags, merged PRs, files) comes from the GitHub API; the plan is
@@ -101,8 +103,26 @@ jobs:
             echo "Last published tag: ${LAST_TAG} (${TAG_DATE})"
           fi
 
-          # Merged PRs on the base branch since the last tag date.
-          gh pr list --repo "$REPO" --state merged --base "$BASE" --limit 100 \
+          # Merge SHAs of the commits on the base branch that are NOT yet
+          # contained in the last tag (compare API). This SHA set — not a
+          # timestamp comparison — is the authoritative definition of "new":
+          # the tagged commit's committer date can precede the mergedAt of the
+          # last merged PR, so a date-only filter re-counts an already released
+          # PR on every rerun and publishes empty releases (v3.2.4 -> v3.2.6
+          # on the same commit). The tag always sits on the base branch HEAD,
+          # so any PR merged after the release has mergedAt > TAG_DATE and is
+          # still picked up by the pre-filter below.
+          if [ -n "${LAST_TAG:-}" ]; then
+            gh api "repos/${REPO}/compare/${LAST_TAG}...${BASE}" \
+              --jq '[.commits[].sha]' > /tmp/new-shas.json
+            echo "Commits on ${BASE} not yet in ${LAST_TAG}: $(jq 'length' /tmp/new-shas.json)"
+          else
+            echo 'null' > /tmp/new-shas.json
+          fi
+
+          # Candidate merged PRs on the base branch (date pre-filter only;
+          # the SHA set above decides what is actually new).
+          gh pr list --repo "$REPO" --state merged --base "$BASE" --limit 300 \
             --json number,title,author,labels,mergedAt \
             --jq ".[] | select(.mergedAt > \"${TAG_DATE}\")" > /tmp/merged.ndjson
 
@@ -118,12 +138,14 @@ jobs:
 
           jq -s \
             --argjson last_tag "$LT" \
+            --slurpfile new_shas /tmp/new-shas.json \
             --arg repo "$REPO" \
             --arg fw "$FWREF" \
-            '{last_tag: $last_tag, source_repo: $repo, framework_ref: $fw, merged_prs: .}' \
+            '{last_tag: $last_tag, new_merge_shas: $new_shas[0], source_repo: $repo, framework_ref: $fw, merged_prs: .}' \
             /tmp/prs.ndjson > /tmp/release-data.json
 
           echo "Merged PRs since last tag: $(jq '.merged_prs | length' /tmp/release-data.json)"
+          echo "New merge SHAs since last tag: $(jq '.new_merge_shas | if . == null then "n/a" else length end' /tmp/release-data.json)"
 
       - name: Compute release plan
         env:

@@ -19,6 +19,17 @@ export interface MergedPr {
 export interface ReleaseInputData {
   /** Last published semver tag, e.g. "v3.2.1", or null when none exists. */
   last_tag: string | null;
+  /**
+   * Merge SHAs of the commits on the base branch that are NOT yet contained
+   * in `last_tag` (resolved by the workflow through the GitHub compare API).
+   * When `last_tag` is set and this list is provided, only merged PRs whose
+   * `mergeSha` appears here count as new; PRs already covered by the tag are
+   * excluded, so a rerun without new merges produces no release. Comparing
+   * SHAs — not timestamps — is what makes the rerun idempotent: a PR merged
+   * in the same second as the tagged commit is still recognized as released.
+   * When null/omitted, every entry of `merged_prs` is considered new.
+   */
+  new_merge_shas?: string[] | null;
   /** Full name of the repository being released, e.g. "owner/repo". */
   source_repo: string;
   /** The pinned framework reference that computed this release. */
@@ -75,6 +86,11 @@ export const RELEASE_PROVENANCE_WARNING =
  * source-aware convention: PATCH for dependency-only releases, MINOR when at
  * least one AI-assisted fix is included, MAJOR never moves. A re-run with the
  * same input yields the same plan (deterministic, no clock reads).
+ *
+ * Only merges not already covered by `last_tag` count: when the workflow
+ * supplies `new_merge_shas`, PRs whose merge SHA is already in the tag are
+ * ignored, so rerunning the release job without new merges yields
+ * `should_release: false` instead of publishing an empty release.
  */
 export function assembleReleasePlan(
   config: MaintenanceConfig,
@@ -95,7 +111,8 @@ export function assembleReleasePlan(
     throw new Error(`last_tag '${data.last_tag}' is not a valid vX.Y.Z tag`);
   }
 
-  const classified: ClassifiedPr[] = data.merged_prs.map((pr) => {
+  const newPrs = selectUnreleasedPrs(data);
+  const classified: ClassifiedPr[] = newPrs.map((pr) => {
     const prInput: PrInput = {
       number: pr.number,
       title: pr.title,
@@ -153,6 +170,20 @@ export function assembleReleasePlan(
     },
   };
   return plan;
+}
+
+/**
+ * Keeps only the merged PRs that are not already covered by the last
+ * published tag. Ancestry is expressed through merge SHAs supplied by the
+ * workflow (`new_merge_shas`); when the workflow did not supply them (or
+ * there is no tag yet), every collected PR counts.
+ */
+function selectUnreleasedPrs(data: ReleaseInputData): MergedPr[] {
+  if (data.last_tag === null || data.new_merge_shas == null) {
+    return data.merged_prs;
+  }
+  const newShas = new Set(data.new_merge_shas);
+  return data.merged_prs.filter((pr) => newShas.has(pr.mergeSha));
 }
 
 function renderNotes(

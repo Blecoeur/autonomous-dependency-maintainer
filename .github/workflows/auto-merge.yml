@@ -138,7 +138,8 @@ jobs:
             if [ "$unmerged" = "$LOCKFILE_PATH" ]; then
               git checkout --ours -- "$LOCKFILE_PATH"
               git add "$LOCKFILE_PATH"
-              git merge --continue --no-edit
+              # `git merge --continue` rejects --no-edit; commit completes the merge.
+              GIT_EDITOR=true git commit --no-edit
               echo "Lockfile conflict resolved by regeneration."
             else
               git merge --abort

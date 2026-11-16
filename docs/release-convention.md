@@ -34,9 +34,14 @@ Other repositories can select `release.versioning: semver` instead.
 
 - Dependabot works from Monday; the release job runs Sunday
   (`0 08 * * 0` UTC) so updates have the week to be validated.
-- A release is created **only** when eligible maintenance PRs were merged
-  since the last published tag (idempotence: rerunning the release job with
-  no new merges must not create a new tag).
+- A release is created **only** when merges not yet covered by the last
+  published tag exist. "New" is decided by **merge-SHA ancestry** (the
+  workflow compares the base branch against the tag and passes the
+  not-yet-tagged merge SHAs to the CLI), never by timestamp comparison:
+  the tagged commit's date can precede the `mergedAt` of the last merged
+  PR, which would re-count an already released PR on every rerun and
+  publish empty releases. Idempotence: rerunning the release job with no
+  new merges must not create a new tag.
 - Release jobs must be serialized (`concurrency` group) to avoid concurrent
   tag creation.
 - The next version is computed from the **last published tag**, never from
