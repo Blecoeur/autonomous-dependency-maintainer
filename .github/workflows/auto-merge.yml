@@ -167,14 +167,18 @@ jobs:
         run: |
           set -euo pipefail
           git add -A
-          if git diff --cached --quiet; then
-            echo "Lockfile already consistent; nothing to push."
-            exit 0
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: regenerate pnpm-lock.yaml with the pinned pnpm" \
+              -m "Dependabot's lockfile update dropped the overrides: section, which made pnpm install --frozen-lockfile fail and blocked the required CI check. Regenerated with pnpm so the lockfile is consistent again."
           fi
-          git commit -m "chore: regenerate pnpm-lock.yaml with the pinned pnpm" \
-            -m "Dependabot's lockfile update dropped the overrides: section, which made pnpm install --frozen-lockfile fail and blocked the required CI check. Regenerated with pnpm so the lockfile is consistent again."
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:$HEAD_REF"
-          echo "Pushed repaired lockfile to $HEAD_REF."
+          # Always push: the merge commit from the previous step must reach
+          # the remote even when the regeneration changed nothing. Pushing
+          # an up-to-date ref is a no-op.
+          if ! git push "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" "HEAD:$HEAD_REF"; then
+            echo "::warning::Push to $HEAD_REF was rejected (remote moved?); the next synchronize event will retry."
+          else
+            echo "Pushed repaired branch to $HEAD_REF."
+          fi
 
   auto-merge:
     name: maintenance-auto-merge
