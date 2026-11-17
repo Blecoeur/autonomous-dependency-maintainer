@@ -132,11 +132,13 @@ jobs:
           if git merge --no-edit "origin/$BASE_BRANCH"; then
             echo "Base merged cleanly."
           else
-            # Only lockfile conflicts are repairable here: take our side and
-            # let the regeneration step rebuild a consistent lockfile.
+            # Only lockfile conflicts are repairable here: take the BASE
+            # branch's lockfile (--theirs in this merge direction) and let the
+            # regeneration step apply only the PR's package.json delta on top,
+            # preserving the base's existing resolutions.
             unmerged=$(git diff --name-only --diff-filter=U)
             if [ "$unmerged" = "$LOCKFILE_PATH" ]; then
-              git checkout --ours -- "$LOCKFILE_PATH"
+              git checkout --theirs -- "$LOCKFILE_PATH"
               git add "$LOCKFILE_PATH"
               # `git merge --continue` rejects --no-edit; commit completes the merge.
               GIT_EDITOR=true git commit --no-edit
