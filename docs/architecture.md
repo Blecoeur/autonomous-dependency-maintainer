@@ -75,8 +75,9 @@ core:
   (`dependencies-only` / `ai-assisted`) from GitHub evidence, bumps the
   version, and emits a provenance JSON next to each GitHub Release.
 - `RepairProvider` receives a structured request (idempotency key =
-  `repo#pr@sha:strategy-version`) and runs one repair attempt to completion:
-  the Phase 3 implementation runs the Mistral vibe CLI on the GitHub Actions
-  runner, re-verifies the result and returns a validated patch; a
-  privileged gateway opens a replacement PR; the same policy engine
-  evaluates it with the `ai-assisted` circuit.
+  `repo#pr@sha:strategy-version`) and submits one repair execution to
+  a Mistral-MANAGED agent (agents deploy; the harness and all repository
+  commands run in the session's MistralSandbox on Mistral Cloud, never on
+  the CI runner). The framework drives one session; a privileged gateway
+  opens a replacement PR from the validated
+  patch; the same policy engine evaluates it with the `ai-assisted` circuit.

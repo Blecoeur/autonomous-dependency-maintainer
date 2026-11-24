@@ -4,16 +4,22 @@
 # Listens to completed runs of the repository's CI workflow and calls the
 # framework's repair orchestrator. Every guard (eligible PR, expected
 # workflow, exact head SHA, reproducible failure, no repair in progress,
-# budget) is evaluated inside the trusted workflow; the repair itself runs
-# the Mistral vibe CLI on a GitHub Actions runner, and the repository's own
-# code only ever executes inside the repair workspace with a scrubbed
-# environment.
+# budget) is evaluated inside the trusted workflow; the repair then runs as
+# ONE SESSION on the Mistral-MANAGED repair agent (deployed once with
+# `agents deploy`, see the framework's agent/ project). The agent harness,
+# tools and all repository commands run in the session's MistralSandbox on
+# Mistral Cloud — never on the GitHub Actions runner; the runner only
+# forwards JSON via the thin agent/client.py (Session API). The session
+# idempotency key is the framework key, so duplicated events dedupe.
 #
 # Setup required before this becomes active:
-# - .maintenance.yml: repair.enabled: true, provider: vibe (+ reviewed
-#   allowed_ai_paths and ai_authors once the gateway phase is deployed)
-# - Repository secrets MISTRAL_API_KEY and GITHUB_READ_TOKEN (read-only;
-#   used only to clone the PR head into the repair workspace)
+# - .maintenance.yml: repair.enabled: true, provider: mistral-agent
+#   (+ reviewed allowed_ai_paths and ai_authors once the gateway is deployed)
+# - Repository secret MISTRAL_API_KEY; optional variable REPAIR_AGENT_NAME
+#   (default repair-dependency-update)
+# - The agent deployed Mistral-managed from the framework's agent/ project
+#   (agents deploy; needs the GitHub connector + cloud_user role for the
+#   MistralSandbox)
 # - A published framework ref (framework-ref below)
 
 name: Maintenance repair request

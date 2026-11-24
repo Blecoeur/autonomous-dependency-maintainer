@@ -1,29 +1,39 @@
-import type { RepairRequest, RepairStatusReport } from '../types.js';
+import type { RepairExecution, RepairRequest, RepairStatusReport } from '../types.js';
+import type { RepairProvider } from '../provider.js';
 
 /**
  * Deterministic in-memory provider for tests and local dry runs.
- * Replays of the same idempotency key return the same report.
+ * Replays of the same idempotency key return the same execution.
  */
-export class MockRepairProvider {
+export class MockRepairProvider implements RepairProvider {
+  private readonly executions = new Map<string, RepairExecution>();
   private readonly reports = new Map<string, RepairStatusReport>();
-  private sequence: RepairStatusReport['status'] = 'blocked';
+  private sequence: RepairStatusReport['status'] = 'in_progress';
 
-  /** Sets the status the next `run()` call reports. */
+  /** Sets the status the next `status()` call reports. */
   setStatus(status: RepairStatusReport['status']): void {
     this.sequence = status;
   }
 
-  async run(request: RepairRequest): Promise<RepairStatusReport> {
-    const existing = this.reports.get(request.idempotency_key);
+  async submit(request: RepairRequest): Promise<RepairExecution> {
+    const existing = this.executions.get(request.idempotency_key);
     if (existing) {
       return existing; // idempotent replay
     }
-    const report: RepairStatusReport = {
-      status: this.sequence,
-      attempt_count: 0,
+    const execution: RepairExecution = {
+      provider: 'mock',
+      execution_id: `mock-${request.idempotency_key}-${this.executions.size + 1}`,
       idempotency_key: request.idempotency_key,
     };
-    this.reports.set(request.idempotency_key, report);
-    return report;
+    this.executions.set(request.idempotency_key, execution);
+    return execution;
+  }
+
+  async status(executionId: string): Promise<RepairStatusReport> {
+    const report = this.reports.get(executionId);
+    if (report) {
+      return report;
+    }
+    return { status: this.sequence, attempt_count: 0 };
   }
 }

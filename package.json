@@ -21,6 +21,7 @@
   "files": [
     "dist",
     "src/providers/repair/skill",
+    "agent/client.py",
     "templates"
   ],
   "scripts": {

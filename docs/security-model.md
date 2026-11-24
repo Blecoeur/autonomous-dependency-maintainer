@@ -61,27 +61,30 @@
 
 ## AI repair circuit (Phase 3)
 
-The repair agent is the Mistral vibe CLI, run by the framework's
-`repair-request.yml` on a GitHub Actions runner (`docs/vibe-repair-provider.md`).
+The repair agent is a **Mistral-managed agent** (`agents deploy`, the
+framework's `agent/` project): the harness, tools and every repository command
+run in the session's `MistralSandbox` on Mistral Cloud. The framework's
+`repair-request.yml` never executes agent or PR code — it runs only the thin
+`agent/client.py`, which opens a session via the Session API
+(`docs/mistral-agent.md`).
 Trust boundaries:
 
-- The agent runs **without GitHub write credentials**. The job token is
-  read-only (`contents: read`, `pull-requests: read`); the clone uses a
-  read-only `GITHUB_READ_TOKEN` passed via a git `http.extraheader`, never
-  embedded in a URL. The agent returns a patch; an external validator
+- The agent runs **without GitHub write credentials**. The workflow token is
+  read-only (`contents: read`, `pull-requests: read`); the sandbox's git
+  identity is the session user via a `GitHubBinding`, never a long-lived
+  token in the agent. The agent returns a patch; an external validator
   (reusing this policy engine) accepts or rejects it; a GitHub App opens
   the replacement PR; the full CI runs from scratch.
-- `MISTRAL_API_KEY` is present in the agent process (the CLI needs it), but
-  **never reaches repository code**: every install/build/test command the
-  harness or the agent runs executes with a scrubbed environment
-  (`PATH`/`HOME`/`LANG`/`TMPDIR`/`CI` only) —
-  `src/providers/repair/vibe/sandbox.ts`.
-- The agent runs with a restricted tool set (`read_file`, `grep`, `edit`,
-  `write_file`, `bash`), `outside_workdir = "deny"`, a bash allowlist of the
-  configured command names, and a framework-owned `VIBE_HOME`: the PR's own
-  `.vibe/` directory, hooks, MCP servers and plugins are never loaded.
+- `MISTRAL_API_KEY` reaches only the thin client process on the runner (the
+  SDK needs it), and **never reaches repository code**: all install/build/
+  test commands execute inside the MistralSandbox, not in any process that
+  holds the key.
+- PR code is only ever checked out and executed inside the session's
+  MistralSandbox (`agent/main.py`): the patch guard (`agent/repair_agent/patch_guard.py`)
+  rejects forbidden paths (tests, CI, policy files) and protected manifest
+  sections before any edit touches disk.
 - The patch is validated twice with this policy engine: once inside the
-  repair job (`validatePatch`, before the artifact is uploaded) and once by
+  agent (`patch_guard.py`, before the report leaves the sandbox) and once by
   the privileged gateway before the replacement PR is opened.
 - The engine's `ai-assisted` circuit already enforces: `ai-assisted` label,
   configured allowed application paths, file-count budget, protected paths

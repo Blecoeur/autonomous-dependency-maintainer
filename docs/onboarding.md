@@ -80,9 +80,10 @@ pnpm + turbo monorepo, active as of 2026-10-24) builds with
 
 ## Roadmap / not yet implemented
 
-- AI repair circuit via the Mistral vibe CLI on the GitHub Actions runner
-  (Phase 3, `RepairProvider`): implemented and unit-tested
-  (`src/providers/repair/vibe/`), not yet deployed. The config keys exist
+- AI repair circuit via a Mistral-MANAGED agent (Phase 3, `RepairProvider`
+  driving one Session-API session on the agent deployed with `agents deploy`
+  from `agent/`): implemented and unit-tested (`src/providers/repair/mistral/`,
+  `agent/`), not yet deployed. The config keys exist
   and are enforced (all AI repairs are currently rejected unless
   `allowed_ai_paths` and `ai_authors` are configured); remaining: create the
   GitHub App gateway that opens replacement PRs from validated patches,

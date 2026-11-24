@@ -1,5 +1,5 @@
 /**
- * Contracts of the AI repair circuit (spec section 7, docs/vibe-repair-provider.md).
+ * Contracts of the AI repair circuit (spec section 7, docs/mistral-agent.md).
  *
  * The framework owns these schemas; adapters translate them to their
  * provider's API. Nothing here is a validated third-party API.
@@ -43,6 +43,13 @@ export interface RepairRequest {
   };
 }
 
+/** A submitted repair, as returned by a provider. */
+export interface RepairExecution {
+  provider: 'mistral-agent' | 'mock';
+  execution_id: string;
+  idempotency_key: string;
+}
+
 export type RepairStatus =
   | 'pr_created'
   | 'blocked'
@@ -50,7 +57,8 @@ export type RepairStatus =
   | 'transient_failure'
   | 'budget_exceeded'
   | 'stale_original_pr'
-  | 'internal_error';
+  | 'internal_error'
+  | 'in_progress';
 
 export interface RepairStatusReport {
   status: RepairStatus;
@@ -60,7 +68,7 @@ export interface RepairStatusReport {
   reason?: string;
   changed_application_files?: string[];
   /**
-   * Unified diff of the validated repair, produced by the vibe provider.
+   * Unified diff of the validated repair, when the provider returns one.
    * The privileged gateway applies it; the agent never pushes.
    */
   patch?: string;
