@@ -4,8 +4,6 @@ A reusable, GitHub-native framework that keeps a repository's dependencies up
 to date with **no human review for the ordinary case**, and **explicit,
 auditable blocking** for everything it cannot guarantee.
 
-Design contract: [AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md](../AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md) (RFC v0.1.0, in French).
-
 ## What it does
 
 - **Weekly Dependabot scans** with a 3-day cooldown, one PR per dependency,
@@ -102,9 +100,7 @@ node dist/cli/check-pr.js --config .maintenance.yml --pr pr.json
 
 ## License
 
-MIT (provisional — adjust before publishing; the Keelflow demonstrator keeps
-its upstream Apache-2.0 obligations, which are independent of this framework's
-license).
+[MIT](LICENSE)
 
 ## Roadmap
 
