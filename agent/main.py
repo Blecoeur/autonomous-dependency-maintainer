@@ -139,7 +139,7 @@ async def finish_repair(report_json: str) -> str:
 
 agent = agents.Agent(
     name="repair-dependency-update",
-    model="mistral-large-latest",
+    model="zai-glm-5-3",
     instructions=(
         DOCTRINE
         + "\n\nYou receive one RepairRequest JSON per message. Workflow: clone the "
