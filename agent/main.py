@@ -120,7 +120,7 @@ async def finish_repair(report_json: str) -> str:
 
 agent = agents.Agent(
     name="repair-dependency-update",
-    model="mistral-large-4",
+    model="glm-5.3",
     instructions=(
         DOCTRINE
         + "\n\nYou receive one RepairRequest JSON per message. Workflow: clone the "
@@ -134,6 +134,7 @@ agent = agents.Agent(
     ),
     tools=[list_files, read_file, apply_edits, run_command, finish_repair],
     environment=agents.MistralSandbox(
-        bindings=[agents.GitHubBinding()],
+        header_bindings=[agents.GitHubBinding(repos=["Blecoeur/keelflow-auto-maintained"])],
+        network=agents.Network.all(),
     ),
 )
