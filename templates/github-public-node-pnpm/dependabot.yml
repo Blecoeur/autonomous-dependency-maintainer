@@ -6,6 +6,9 @@
 # - 3-day cooldown (explicit even though Dependabot applies it by default)
 # - ordinary MAJOR version updates are ignored (audit circuit handles them)
 # - one PR per dependency, capped at 20 open PRs
+# - rebase-strategy "disabled": the default auto-rebase force-pushes the PR
+#   branch and would clobber the repair commits the framework pushes onto
+#   dependency PR branches
 #
 # Notes:
 # - Cooldown applies to version updates, not security updates. Security
@@ -25,6 +28,7 @@ updates:
       day: monday
       time: '06:00'
       timezone: Europe/Zurich
+    rebase-strategy: 'disabled'
     cooldown:
       default-days: 3
     open-pull-requests-limit: 20
@@ -40,6 +44,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    rebase-strategy: 'disabled'
     cooldown:
       default-days: 3
     labels:

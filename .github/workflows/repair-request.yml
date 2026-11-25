@@ -2,19 +2,22 @@
 #
 # Trusted job: listens (via the consumer's wrapper) to completed CI runs,
 # verifies ALL deterministic guards (spec 7.1) through the framework CLI,
-# then runs ONE repair attempt with the Mistral vibe CLI directly on this
-# runner and re-validates the produced patch with the policy engine.
+# then opens ONE session on the Mistral-MANAGED repair agent (agents deploy)
+# via `maintenance-repair-run`.
 #
 # Trust model:
-# - The guard job never checks out PR code. The repair job checks out the
-#   PR head SHA — that code is untrusted and is only ever executed inside
-#   the repair workspace with a scrubbed environment.
+# - Neither job checks out PR code. The agent harness, its tools and every
+#   repository command run inside the session's MistralSandbox on Mistral
+#   Cloud (see agent/); the Actions runner only forwards JSON through the
+#   thin agent/client.py (Session API).
 # - Both jobs run with a read-only token (contents: read,
 #   pull-requests: read). The agent never holds GitHub write credentials;
-#   MISTRAL_API_KEY and GITHUB_READ_TOKEN never reach repository commands.
+#   MISTRAL_API_KEY never reaches repository commands.
 # - Secrets are only read when every guard has passed; without
 #   MISTRAL_API_KEY the repair job reports eligibility and exits 0: an
 #   explicit, visible block instead of a silent skip (spec rule 10).
+# - Idempotence: the session idempotency key IS the framework's idempotency
+#   key, so duplicated events return the same session/turn server-side.
 #
 # NOT included in this workflow (gateway phase, deployed separately):
 # creating the replacement PR from the validated patch — done by a
@@ -181,12 +184,11 @@ jobs:
       pull-requests: read
     env:
       MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
-      GITHUB_READ_TOKEN: ${{ secrets.GITHUB_READ_TOKEN }}
     steps:
       - name: Check provider secret (explicit block, never a silent skip)
         run: |
           if [ -z "${MISTRAL_API_KEY:-}" ]; then
-            echo "::notice::Repair eligible, but MISTRAL_API_KEY is not configured in this repository. Not running (explicit block)."
+            echo "::notice::Repair eligible, but MISTRAL_API_KEY is not configured in this repository. Not submitting (explicit block)."
             exit 0
           fi
 
@@ -213,22 +215,26 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: framework/pnpm-lock.yaml
 
-      - name: Install pnpm
-        run: corepack enable && corepack prepare pnpm@10.32.1 --activate
-
-      - name: Install uv (pinned vibe CLI launcher)
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
       - name: Build framework CLI
         run: |
           pnpm --dir framework install --frozen-lockfile
           pnpm --dir framework build
 
-      - name: Run the repair attempt (vibe on the runner)
+      # Thin client only: installs the Agents SDK launcher (uvx) and calls
+      # agent/client.py, which opens a session on the Mistral-managed agent.
+      # The agent runs in the session's MistralSandbox, never on this runner.
+      # The session idempotency key is the framework key: replays dedupe.
+      - name: Install uv (Agents SDK launcher for the thin client)
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run the repair session (Mistral-managed agent)
         env:
           REPAIR_PATCH_FILE: /tmp/repair.patch
+          REPAIR_TIMEOUT_SECONDS: '3300'
+          REPAIR_POLL_INTERVAL_SECONDS: '15'
+          REPAIR_AGENT_NAME: ${{ vars.REPAIR_AGENT_NAME || 'repair-dependency-update' }}
           # Passed through the environment, never interpolated into the
           # script: the request JSON is data, not shell.
           REPAIR_REQUEST: ${{ needs.guards.outputs.request }}

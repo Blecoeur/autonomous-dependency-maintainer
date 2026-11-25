@@ -7,6 +7,10 @@
 # Cooldown applies to version updates, not security updates. Ordinary majors
 # are deferred per policy; the npm dependencies here are dev/build tooling
 # (typescript, vitest, picomatch, yaml, @types/node).
+#
+# rebase-strategy is "disabled": the default auto-rebase force-pushes the PR
+# branch, which would clobber the lockfile-repair and AI-repair commits the
+# framework pushes onto dependency PR branches.
 
 version: 2
 updates:
@@ -15,6 +19,7 @@ updates:
     schedule:
       interval: weekly
       day: monday
+    rebase-strategy: 'disabled'
     cooldown:
       default-days: 3
     open-pull-requests-limit: 10

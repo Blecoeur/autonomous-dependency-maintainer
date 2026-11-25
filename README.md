@@ -4,8 +4,6 @@ A reusable, GitHub-native framework that keeps a repository's dependencies up
 to date with **no human review for the ordinary case**, and **explicit,
 auditable blocking** for everything it cannot guarantee.
 
-Design contract: [AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md](../AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md) (RFC v0.1.0, in French).
-
 ## What it does
 
 - **Weekly Dependabot scans** with a 3-day cooldown, one PR per dependency,
@@ -18,8 +16,9 @@ Design contract: [AUTONOMOUS_DEPENDENCY_MAINTENANCE_SPEC.md](../AUTONOMOUS_DEPEN
 - **Explicit blocking**: majors, unverifiable updates, test weakening, and CI
   workflow changes stay visible instead of being silently merged.
 - An optional, not-yet-deployed **AI repair circuit** behind a
-  `RepairProvider` interface (Mistral vibe CLI run on the GitHub Actions
-  runner in Phase 3).
+  `RepairProvider` interface (Mistral-managed agent in Phase 3: the
+  framework drives one Session-API session on the agent deployed with
+  `agents deploy`; the agent runs in its MistralSandbox, not on the CI runner).
 
 ## Status
 
@@ -101,16 +100,15 @@ node dist/cli/check-pr.js --config .maintenance.yml --pr pr.json
 
 ## License
 
-MIT (provisional — adjust before publishing; the Keelflow demonstrator keeps
-its upstream Apache-2.0 obligations, which are independent of this framework's
-license).
+[MIT](LICENSE)
 
 ## Roadmap
 
-- Phase 3 (in progress): the `RepairProvider` interface, the Mistral vibe
-  CLI provider running on the GitHub Actions runner, deterministic repair
-  guards, patch validation and the repair-request orchestrator are
-  implemented and tested; remaining: create the GitHub App gateway that
+- Phase 3 (in progress): the `RepairProvider` interface, the Mistral managed
+  agent adapter (`src/providers/repair/mistral/`), the agent project
+  (`agent/`, deployed with `agents deploy`), deterministic repair guards, patch validation
+  and the repair-request orchestrator are implemented and tested; remaining:
+  run a worker in your environment and create the GitHub App gateway that
   opens replacement PRs from validated patches, then enable `repair` in
   consumer configs.
 - Phase 4: major-version audit circuit (`deferred` / `migration-required` /
