@@ -88,23 +88,42 @@ async def run_command(command: str, timeout_seconds: int = 600) -> str:
     Only the verification commands carried in the RepairRequest (install /
     build / test from the consumer's .maintenance.yml) plus read-only
     inspection commands (git, ls, cat, pnpm why, ...) are acceptable; the
-    doctrine forbids anything else. Output is truncated.
+    doctrine forbids anything else. Output is redirected to a file and only
+    the tail is returned, to keep the sandbox stream short. Transient
+    failures (sandbox connection drops) are retried up to 3 times.
     """
     import asyncio
-    import subprocess
 
-    proc = await asyncio.create_subprocess_shell(
-        command,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.STDOUT,
-        cwd=str(Path.cwd()),
+    wrapped = (
+        f"{command} > /tmp/run_command_out.txt 2>&1; "
+        f'echo "EXIT_CODE:$?" >> /tmp/run_command_out.txt'
     )
+    last_error = ""
+    for attempt in range(1, 4):
+        proc = await asyncio.create_subprocess_shell(
+            wrapped,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+            cwd=str(Path.cwd()),
+        )
+        try:
+            await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
+            break
+        except asyncio.TimeoutError:
+            proc.kill()
+            last_error = f"TIMEOUT after {timeout_seconds}s (attempt {attempt}/3): {command}"
+            if attempt == 3:
+                return last_error
+        except Exception as exc:  # transient sandbox/connection failure
+            last_error = f"attempt {attempt}/3 failed: {type(exc).__name__}: {exc}"
+            if attempt == 3:
+                return f"FAILED after 3 attempts: {last_error}"
+        await asyncio.sleep(2 * attempt)
     try:
-        out, _ = await asyncio.wait_for(proc.communicate(), timeout=timeout_seconds)
-    except asyncio.TimeoutError:
-        proc.kill()
-        return f"TIMEOUT after {timeout_seconds}s: {command}"
-    return out.decode("utf-8", errors="replace")[-20_000:]
+        out = Path("/tmp/run_command_out.txt").read_bytes()[-20_000:]
+    except OSError:
+        return last_error or "no output captured"
+    return out.decode("utf-8", errors="replace")
 
 
 @agents.tool

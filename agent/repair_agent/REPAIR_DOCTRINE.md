@@ -28,6 +28,10 @@ again with the smallest possible change, then finish.
    patch is a failure.
 6. The harness re-runs the verification itself — never claim success you
    have not seen from `run_verification`.
+7. If `run_command` fails repeatedly because the sandbox connection drops
+   or the command cannot execute (3 consecutive failed attempts), stop
+   retrying: call `finish` with status `transient_failure` and the last
+   error. Do not loop on infrastructure errors.
 
 ## How to work
 
@@ -46,4 +50,6 @@ again with the smallest possible change, then finish.
 
 - `pr_created` — verification passed with your fix applied.
 - `blocked` — the fix requires a forbidden change (see doctrine 5).
+- `transient_failure` — infrastructure problem (sandbox connection lost,
+  command could not run after retries); see doctrine 7.
 - Do not use other statuses; the harness decides those.
